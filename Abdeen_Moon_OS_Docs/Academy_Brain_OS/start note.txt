@@ -1,0 +1,7 @@
+I want to start a new course.
+Course:
+Level:
+Age:
+Available materials:
+Preferred output strategy:
+Reference outputs:

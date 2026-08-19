@@ -1,0 +1,18 @@
+# ruflo runtime
+.claude-flow/data/
+.claude-flow/logs/
+.claude-flow/sessions/
+*.db
+*.db-journal
+
+# obsidian
+.obsidian/workspace*
+.trash/
+
+# node
+node_modules/
+
+# os
+desktop.ini
+Thumbs.db
+.DS_Store
