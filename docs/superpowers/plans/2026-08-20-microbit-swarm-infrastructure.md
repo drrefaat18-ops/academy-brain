@@ -8,6 +8,23 @@
 
 **Tech Stack:** Python 3.11.15, uv 0.11.32, pytest 9.1.1, python-pptx, python-docx, PyYAML. Provider CLIs: `claude`, `hermes`, `codex`, `gemini` (all installed and on PATH as of 2026-08-20). Antigravity has no headless CLI and is not used.
 
+## Verified Provider Invocations
+
+All four confirmed returning output on 2026-08-20. Use these exact forms; do not improvise flags.
+
+| Provider | Command |
+| --- | --- |
+| Claude | native (Agent tool / `claude`) |
+| Hermes | `"C:/Users/ET/AppData/Local/hermes/hermes-agent/venv/Scripts/hermes" -z "<prompt>" --safe-mode` |
+| Codex | `codex exec --skip-git-repo-check "<prompt>" < /dev/null` — run from the vault root |
+| Gemini | `gemini --skip-trust -p "<prompt>"` — requires `GEMINI_API_KEY` |
+
+Two traps already hit and resolved; do not rediscover them:
+
+- **Codex and Gemini both refuse to run outside a "trusted directory."** Codex needs `--skip-git-repo-check`, Gemini needs `--skip-trust`. Without these they exit non-zero with a trust error that looks like an auth failure.
+- **Gemini's `~/.gemini/settings.json` caches `security.auth.selectedType`.** If it is `oauth-personal`, the CLI ignores `GEMINI_API_KEY` and fails with `IneligibleTierError` — Google discontinued individual Code Assist OAuth for this client. It must be set to `gemini-api-key`.
+- **Antigravity has no headless CLI**, only `Antigravity.exe` and an IDE launcher. It cannot be a swarm worker. Gemini holds that lane.
+
 ## Global Constraints
 
 Copied verbatim from `docs/superpowers/specs/2026-08-20-microbit-course-swarm-design.md`. Every task's requirements implicitly include this section.
