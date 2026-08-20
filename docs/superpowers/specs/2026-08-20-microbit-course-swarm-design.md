@@ -11,7 +11,7 @@
 Two goals of equal weight:
 
 1. **Product.** Rebuild the Techno Square Micro:bit course (Level 1 + Level 2) from existing material, improving both content accuracy and pedagogy. Not a re-skin — a genuine content upgrade.
-2. **Capability.** Owner learns cross-provider agentic swarm (Claude + Codex + Antigravity + Hermes + Gemini), as opposed to single-provider swarm which he already does.
+2. **Capability.** Owner learns cross-provider agentic swarm (Claude + Codex + Gemini + Hermes), as opposed to single-provider swarm which he already does.
 
 ### Non-goals
 
@@ -72,20 +72,20 @@ These are stated by the owner and override design preference.
 | --- | --- | --- |
 | DIGEST | `digest_office.py` + Codex gate | Mechanical; LLMs add nothing to XML extraction |
 | PROVENANCE | Hermes | Web toolsets; proven in this role on the AI course |
-| RESEARCH | Hermes + Antigravity + Codex (3-way) | Different providers surface different sources |
-| REFINE | Claude + Codex + Antigravity (3-way) | Highest-judgment stage |
+| RESEARCH | Hermes + Codex + Gemini (3-way) | Different providers surface different sources |
+| REFINE | Codex + Gemini + Hermes (3-way) | Highest-judgment stage; Claude excluded so the judge is not also a contestant |
 | JUDGE / REFUTE | Claude | Does not compete in the stages it judges |
 | QA | Haiku + deterministic scripts | Checklist is pass/fail, not opinion |
 | LOCALIZE | Claude only | Only provider trusted with Egyptian-colloquial Arabic |
 | GENERATE | NBLM via Claude; Gemini for PDFs | Renderers, not reasoners |
 
-Claude is deliberately excluded from the RESEARCH fan-out because it performs the merge. A provider must not both compete and adjudicate in the same stage.
+Claude is deliberately excluded from **both** fan-out stages because it performs the merge and the judging. A provider must not both compete and adjudicate in the same stage. With no human domain review (C1), the judge is the load-bearing component of the quality model and must be impartial. Claude's pedagogical strength is applied at JUDGE, REFUTE, and LOCALIZE instead.
 
 ### Language policy — language-neutral swarm
 
 Brain OS mandates literal **30% English / 70% Arabic**, Egyptian colloquial, simple register, RTL-correct.
 
-Codex, Antigravity, and Hermes are materially weaker at colloquial Egyptian Arabic than Claude. Therefore **Arabic never enters the swarm.** All fan-out stages operate in structured English — pedagogy, sequencing, critiques, citations. A single Claude localisation pass (S5b) converts approved English content into 30/70 bilingual copy, gated by `arabic_ratio.py`.
+Codex, Gemini, and Hermes are materially weaker at colloquial Egyptian Arabic than Claude. Therefore **Arabic never enters the swarm.** All fan-out stages operate in structured English — pedagogy, sequencing, critiques, citations. A single Claude localisation pass (S5b) converts approved English content into 30/70 bilingual copy, gated by `arabic_ratio.py`.
 
 This removes the weakest link rather than scoring it, and keeps the 3-way fan-out honest.
 
@@ -196,10 +196,10 @@ D:\vault\Microbit\
 │     _assets\L1-s1\img-01.png + manifest.json
 ├── 20-provenance\         Hermes
 ├── 30-research\
-│     _lanes\T01\{hermes,agy,codex}.json
+│     _lanes\T01\{hermes,codex,gemini}.json
 │     T01.md … T06.md         merged
 ├── 40-critique\
-│     L1-s1\{claude,codex,agy}.json
+│     L1-s1\{codex,gemini,hermes}.json
 ├── 50-patch\              judge output: merged change-set
 ├── 55-refuted\            refuter verdicts
 ├── 60-approved\           canonical English content, post-QA
@@ -219,10 +219,10 @@ Read-only sources, never written to: `Abdeen_Moon_OS_Docs\`, `Techno Square iden
 Fan-out stages write to separate lane files whose paths do not intersect:
 
 ```
-40-critique/L1-s3/claude.json    only Claude writes
 40-critique/L1-s3/codex.json     only Codex writes
-40-critique/L1-s3/agy.json       only Antigravity writes
-50-patch/L1-s3.md                only the judge writes
+40-critique/L1-s3/gemini.json    only Gemini writes
+40-critique/L1-s3/hermes.json    only Hermes writes
+50-patch/L1-s3.md                only the judge (Claude) writes
 ```
 
 Three providers run concurrently with zero locking. Merging is a separate stage with a single owner. This satisfies ruflo's own concurrency rule (explicit file ownership, never two writers in one scope) without needing a git worktree per agent.
@@ -372,7 +372,9 @@ Ruflo's control flow is model-driven, which creates a risk that an agent skips a
 | Provider | Invocation | Adapter skill |
 | --- | --- | --- |
 | Codex | `codex exec` | `codex-delegate` (installed) |
-| Antigravity | `agy` | `agy-delegate` (installed) |
+| Gemini | `gemini -p` | `gemini-delegate` (installed; requires GEMINI_API_KEY or Google login) |
+
+Codex requires a trusted git directory; invoke as `codex exec --skip-git-repo-check "<prompt>" < /dev/null` from the vault root. Verified working 2026-08-20.
 | Gemini | `gemini -p` | `gemini-delegate` (installed) |
 | Hermes | `hermes -z "<prompt>" --skills … -t …` | **`hermes-delegate` (must be written)** |
 

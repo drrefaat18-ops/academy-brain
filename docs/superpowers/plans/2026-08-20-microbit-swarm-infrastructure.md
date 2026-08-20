@@ -6,7 +6,7 @@
 
 **Architecture:** A small Python package (`scripts/swarm/`) provides path derivation, frontmatter envelopes, Office extraction, and six deterministic gates. A gate runner composes gates and writes `PASS`/`FAIL`/`UNVERIFIED` receipts. Provider CLIs are reached through uniform adapter skills. EthOS v2 holds doctrine; ruflo holds scheduling. Nothing in this plan makes a model call — every component here is mechanically testable, which is what makes unattended operation safe.
 
-**Tech Stack:** Python 3.11.15, uv 0.11.32, pytest 9.1.1, python-pptx, python-docx, PyYAML. Provider CLIs: `claude`, `hermes` (installed), `codex`, `agy`, `gemini` (not yet on PATH).
+**Tech Stack:** Python 3.11.15, uv 0.11.32, pytest 9.1.1, python-pptx, python-docx, PyYAML. Provider CLIs: `claude`, `hermes`, `codex`, `gemini` (all installed and on PATH as of 2026-08-20). Antigravity has no headless CLI and is not used.
 
 ## Global Constraints
 
@@ -215,7 +215,7 @@ def test_assets_dir_is_per_session():
 def test_lane_paths_never_collide_across_providers():
     lanes = {
         paths.lane_path("40-critique", "L1-s3", provider)
-        for provider in ("claude", "codex", "agy")
+        for provider in ("codex", "gemini", "hermes")
     }
     assert len(lanes) == 3
 
@@ -262,7 +262,7 @@ SESSION_IDS: tuple[str, ...] = tuple(
     f"L{level}-s{n}" for level in (1, 2) for n in range(1, 8)
 )
 
-PROVIDERS: frozenset[str] = frozenset({"claude", "codex", "agy", "hermes"})
+PROVIDERS: frozenset[str] = frozenset({"claude", "codex", "gemini", "hermes"})
 
 _SESSION_RE = re.compile(r"^L[12]-s[1-7]$")
 
@@ -1599,8 +1599,8 @@ Create `tests/test_doctor_providers.py`:
 import doctor_providers
 
 
-def test_covers_all_four_swarm_providers():
-    assert set(doctor_providers.PROVIDER_COMMANDS) == {"claude", "codex", "agy", "hermes", "gemini"}
+def test_covers_all_swarm_providers():
+    assert set(doctor_providers.PROVIDER_COMMANDS) == {"claude", "codex", "gemini", "hermes"}
 
 
 def test_probe_reports_reachable_when_found():
@@ -1657,9 +1657,8 @@ import sys
 PROVIDER_COMMANDS: dict[str, str] = {
     "claude": "claude",
     "codex": "codex",
-    "agy": "agy",
-    "hermes": "hermes",
     "gemini": "gemini",
+    "hermes": "hermes",
 }
 
 
@@ -1763,8 +1762,9 @@ def test_fanout_stages_declare_three_providers():
     assert len(scaffold_vault.TOPOLOGY["30-research"]["fanout"]) == 3
 
 
-def test_claude_does_not_compete_in_research_it_merges():
+def test_claude_never_competes_in_a_stage_it_judges():
     assert "claude" not in scaffold_vault.TOPOLOGY["30-research"]["fanout"]
+    assert "claude" not in scaffold_vault.TOPOLOGY["40-critique"]["fanout"]
     assert scaffold_vault.TOPOLOGY["30-research"]["owner"] == "claude"
 
 
@@ -1818,12 +1818,12 @@ TOPOLOGY: dict[str, dict] = {
     "20-provenance": {"owner": "hermes", "fanout": (), "writes": "one file per session"},
     "30-research": {
         "owner": "claude",
-        "fanout": ("hermes", "agy", "codex"),
+        "fanout": ("hermes", "codex", "gemini"),
         "writes": "_lanes/<cluster>/<provider>.json, merged to <cluster>.md",
     },
     "40-critique": {
         "owner": "claude",
-        "fanout": ("claude", "codex", "agy"),
+        "fanout": ("codex", "gemini", "hermes"),
         "writes": "<session>/<provider>.json",
     },
     "50-patch": {"owner": "claude", "fanout": (), "writes": "one file per session"},
@@ -2493,4 +2493,9 @@ Tasks 1–3 are foundational and must run in order. Tasks 6–9 (the four gates)
 
 ## Blocking dependency
 
-**Task 11 will report `codex`, `agy`, and `gemini` as MISSING** unless they are installed in the meantime. The swarm design assigns real roles to all three. Before the pipeline runs, either install those CLIs and confirm they are on PATH, or reassign their stages — which changes the fan-out from three lanes to fewer and materially weakens the cross-provider design. This is a decision for the owner, not something to work around silently.
+**Resolved 2026-08-20.** `@openai/codex` and `@google/gemini-cli` were installed globally; `codex`, `gemini`, `claude`, and `hermes` all resolve. Antigravity ships only a GUI IDE (`Antigravity.exe`, `antigravity-ide.cmd`) with no headless agent CLI, so **Gemini takes its lane** — an independently developed provider, which preserves real cross-provider divergence.
+
+Two verification facts for implementers:
+
+- **Codex** requires a trusted git directory: `codex exec --skip-git-repo-check "<prompt>" < /dev/null`, run from the vault root. Verified returning output.
+- **Gemini** requires auth before use: either `GEMINI_API_KEY` in the environment, or a Google login via the interactive TUI. **Not yet configured at time of writing** — Task 11 will report it reachable but it will fail at call time until the owner sets this up. Confirm before any stage delegates to Gemini.
