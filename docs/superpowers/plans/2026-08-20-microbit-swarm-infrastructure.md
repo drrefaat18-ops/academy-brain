@@ -1577,7 +1577,7 @@ git commit -m "feat: gate runner with FAIL-beats-UNVERIFIED-beats-PASS receipts"
 
 ### Task 11: Provider reachability doctor
 
-The swarm cannot shell out to a CLI it cannot resolve. At planning time only `claude` and `hermes` were on PATH; `codex`, `agy`, and `gemini` were not. This task makes that a measured fact with a written report rather than an assumption.
+The swarm cannot shell out to a CLI it cannot resolve. At planning time only `claude` and `hermes` were on PATH; `codex` and `gemini` were installed during planning. This task makes reachability a measured fact with a written report rather than an assumption, and catches regressions (an uninstall, a PATH change) before a stage fails mid-run.
 
 **Files:**
 - Create: `scripts/doctor_providers.py`
@@ -1701,9 +1701,9 @@ Expected: PASS, 6 passed
 - [ ] **Step 5: Run it for real and record the result**
 
 Run: `cd "D:/vault/Microbit" && uv run python scripts/doctor_providers.py`
-Expected: exit 1, with `codex`, `agy`, `gemini` reported MISSING unless they have been installed since planning.
+Expected: exit 0, with `claude`, `codex`, `gemini`, and `hermes` all reported OK.
 
-This output is the input to the next decision: either install the missing CLIs, or reassign their swarm roles to reachable providers. Do not proceed to Task 12 assuming five providers.
+If any provider reports MISSING, stop: either reinstall it or reassign its swarm roles before continuing. Note that reachability is not the same as usability — `gemini` resolves on PATH but fails at call time until auth is configured (Google login or `GEMINI_API_KEY`).
 
 - [ ] **Step 6: Commit**
 
