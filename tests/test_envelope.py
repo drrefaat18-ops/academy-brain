@@ -57,3 +57,13 @@ def test_read_scope_blocks_other_sessions():
     env, _ = envelope.parse(SAMPLE)
     assert not envelope.is_read_allowed(env, "10-digest/L1-s4.md")
     assert not envelope.is_read_allowed(env, "60-approved/L2-s1.md")
+
+
+def test_read_scope_blocks_case_variant():
+    env, _ = envelope.parse(SAMPLE)
+    assert not envelope.is_read_allowed(env, "10-DIGEST/L1-S3.MD")
+
+
+def test_read_scope_blocks_dotdot_traversal():
+    env, _ = envelope.parse(SAMPLE)
+    assert not envelope.is_read_allowed(env, "00-contracts/../secret/file.md")

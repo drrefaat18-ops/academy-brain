@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import fnmatch
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import yaml
 
@@ -85,9 +85,6 @@ def is_read_allowed(env: Envelope, path: str) -> bool:
     session's files plus frozen contracts, never the vault.
     """
     normalized = path.replace("\\", "/")
-    for pattern in env.reads_allowed:
-        if fnmatch.fnmatch(normalized, pattern):
-            return True
-        if pattern.endswith("/**") and normalized.startswith(pattern[:-3] + "/"):
-            return True
-    return False
+    if ".." in normalized.split("/"):
+        return False
+    return any(fnmatch.fnmatchcase(normalized, pattern) for pattern in env.reads_allowed)
