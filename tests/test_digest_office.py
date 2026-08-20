@@ -70,3 +70,34 @@ def test_warns_on_empty_slide(tmp_path):
 def test_rejects_invalid_session_id(sample_pptx, tmp_path):
     with pytest.raises(ValueError):
         digest_office.extract_pptx(sample_pptx, "L9-s9", tmp_path / "assets")
+
+
+def test_image_only_slide_not_flagged_empty(tmp_path):
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])  # blank layout, no text
+    png = tmp_path / "dot.png"
+    png.write_bytes(
+        bytes.fromhex(
+            "89504e470d0a1a0a0000000d4948445200000001000000010802000000907753"
+            "de0000000c4944415408d76360000000020001e221bc330000000049454e44ae426082"
+        )
+    )
+    slide.shapes.add_picture(str(png), Inches(1), Inches(1))
+    src = tmp_path / "image_only.pptx"
+    prs.save(str(src))
+
+    result = digest_office.extract_pptx(src, "L1-s3", tmp_path / "assets")
+    assert not any("empty" in w for w in result.warnings)
+
+
+def test_warns_when_image_save_fails(sample_pptx, tmp_path, monkeypatch):
+    from pptx.shapes.picture import Picture
+
+    def broken_image(self):
+        raise ValueError("corrupt blob")
+
+    monkeypatch.setattr(Picture, "image", property(broken_image))
+
+    result = digest_office.extract_pptx(sample_pptx, "L1-s4", tmp_path / "assets")
+    assert any("failed to save image" in w for w in result.warnings)
+    assert len(result.images) == 0

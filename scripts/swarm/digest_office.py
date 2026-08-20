@@ -12,6 +12,7 @@ from pathlib import Path
 
 import docx
 from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 from swarm.paths import validate_session_id
 
@@ -43,8 +44,10 @@ def extract_pptx(src: Path, sid: str, out_dir: Path) -> DigestResult:
         title = ""
         body_parts: list[str] = []
 
+        has_image = False
         for shape in slide.shapes:
-            if shape.shape_type == 13 or getattr(shape, "image", None) is not None:
+            if shape.shape_type == MSO_SHAPE_TYPE.PICTURE or getattr(shape, "image", None) is not None:
+                has_image = True
                 _save_image(shape, i, len(result.images) + 1, out_dir, result)
                 continue
             if not shape.has_text_frame:
@@ -61,7 +64,7 @@ def extract_pptx(src: Path, sid: str, out_dir: Path) -> DigestResult:
         if slide.has_notes_slide:
             notes = slide.notes_slide.notes_text_frame.text.strip()
 
-        if not title and not body_parts:
+        if not title and not body_parts and not has_image:
             result.warnings.append(f"slide {i} is empty (no title, no body)")
 
         result.slides.append(
@@ -75,7 +78,8 @@ def extract_pptx(src: Path, sid: str, out_dir: Path) -> DigestResult:
 def _save_image(shape, slide_index: int, seq: int, out_dir: Path, result: DigestResult) -> None:
     try:
         image = shape.image
-    except (AttributeError, ValueError):
+    except (AttributeError, ValueError) as exc:
+        result.warnings.append(f"slide {slide_index}: failed to save image ({exc})")
         return
     name = f"img-{seq:02d}.{image.ext}"
     (out_dir / name).write_bytes(image.blob)
