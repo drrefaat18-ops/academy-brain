@@ -35,11 +35,11 @@ TOPOLOGY: dict[str, dict] = {
         "fanout": ("codex", "gemini", "hermes"),
         "writes": "<session>/<provider>.json",
     },
-    "50-patch": {"owner": "claude", "fanout": (), "writes": "one file per session"},
-    "55-refuted": {"owner": "claude", "fanout": (), "writes": "one file per session"},
-    "60-approved": {"owner": "claude", "fanout": (), "writes": "one file per session"},
+    "50-patch": {"owner": "codex", "reviewer": "claude", "fanout": (), "writes": "one file per session"},
+    "55-refuted": {"owner": "codex", "reviewer": "claude", "fanout": (), "writes": "one file per session"},
+    "60-approved": {"owner": "codex", "reviewer": "claude", "fanout": (), "writes": "one file per session"},
     "70-localized": {"owner": "claude", "fanout": (), "writes": "one file per session"},
-    "80-generation": {"owner": "claude", "fanout": (), "writes": "prompts and rendered output"},
+    "80-generation": {"owner": "claude", "fanout": (), "writes": "prompts and rendered output (NotebookLM MCP is claude-only)"},
     "90-receipts": {"owner": "script", "fanout": (), "writes": "<session>.<gate>.yaml"},
 }
 
@@ -63,13 +63,14 @@ def render_topology() -> str:
         "",
         "One writer per file, never one writer per folder.",
         "",
-        "| stage | owner | fan-out | writes |",
-        "| --- | --- | --- | --- |",
+        "| stage | owner | reviewer | fan-out | writes |",
+        "| --- | --- | --- | --- | --- |",
     ]
     for name in STAGE_DIRS:
         t = TOPOLOGY[name]
         fanout = ", ".join(t["fanout"]) if t["fanout"] else "—"
-        lines.append(f"| `{name}` | {t['owner']} | {fanout} | {t['writes']} |")
+        reviewer = t.get("reviewer", "—")
+        lines.append(f"| `{name}` | {t['owner']} | {reviewer} | {fanout} | {t['writes']} |")
     return "\n".join(lines) + "\n"
 
 
