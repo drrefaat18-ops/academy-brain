@@ -61,6 +61,12 @@
       "skillPath": "skills/kimi-delegate/SKILL.md",
       "computedHash": "861853004c7bbfda6edb6bf75011436716e5c5f737aec94fa25ec315370064db"
     },
+    "master-instructional-design": {
+      "source": "narosemena/master-instructional-design",
+      "sourceType": "github",
+      "skillPath": "master-instructional-design/SKILL.md",
+      "computedHash": "743efdaeb9759cfcef6c7987d04d3f4fcb6d6b8bc61058a5eeec010348756875"
+    },
     "opencode-delegate": {
       "source": "amElnagdy/delegate-skills",
       "sourceType": "github",
