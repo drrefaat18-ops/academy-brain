@@ -1,0 +1,83 @@
+{
+  "id": "L2-s2",
+  "images": [
+    {
+      "file": "img-01.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 7466
+    },
+    {
+      "file": "img-02.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 7466
+    },
+    {
+      "file": "img-03.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 7466
+    },
+    {
+      "file": "img-04.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 8049
+    },
+    {
+      "file": "img-05.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 8383
+    },
+    {
+      "file": "img-06.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 5839
+    },
+    {
+      "file": "img-07.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 7466
+    },
+    {
+      "file": "img-08.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 8049
+    },
+    {
+      "file": "img-09.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 7585
+    },
+    {
+      "file": "img-10.png",
+      "slide": 9,
+      "ext": "png",
+      "bytes": 15933
+    },
+    {
+      "file": "img-11.jpg",
+      "slide": 14,
+      "ext": "jpg",
+      "bytes": 55308
+    },
+    {
+      "file": "img-12.jpg",
+      "slide": 14,
+      "ext": "jpg",
+      "bytes": 87198
+    },
+    {
+      "file": "img-13.jpg",
+      "slide": 14,
+      "ext": "jpg",
+      "bytes": 76054
+    }
+  ]
+}

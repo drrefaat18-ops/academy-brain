@@ -1,0 +1,137 @@
+{
+  "id": "L2-s1",
+  "images": [
+    {
+      "file": "img-01.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 50423
+    },
+    {
+      "file": "img-02.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 50423
+    },
+    {
+      "file": "img-03.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 50423
+    },
+    {
+      "file": "img-04.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 45534
+    },
+    {
+      "file": "img-05.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 35785
+    },
+    {
+      "file": "img-06.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 34596
+    },
+    {
+      "file": "img-07.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 50423
+    },
+    {
+      "file": "img-08.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 45534
+    },
+    {
+      "file": "img-09.png",
+      "slide": 1,
+      "ext": "png",
+      "bytes": 7585
+    },
+    {
+      "file": "img-10.png",
+      "slide": 6,
+      "ext": "png",
+      "bytes": 15037
+    },
+    {
+      "file": "img-11.png",
+      "slide": 6,
+      "ext": "png",
+      "bytes": 16647
+    },
+    {
+      "file": "img-12.png",
+      "slide": 6,
+      "ext": "png",
+      "bytes": 10152
+    },
+    {
+      "file": "img-13.png",
+      "slide": 7,
+      "ext": "png",
+      "bytes": 15037
+    },
+    {
+      "file": "img-14.png",
+      "slide": 7,
+      "ext": "png",
+      "bytes": 16647
+    },
+    {
+      "file": "img-15.png",
+      "slide": 7,
+      "ext": "png",
+      "bytes": 10152
+    },
+    {
+      "file": "img-16.png",
+      "slide": 8,
+      "ext": "png",
+      "bytes": 16647
+    },
+    {
+      "file": "img-17.png",
+      "slide": 8,
+      "ext": "png",
+      "bytes": 10152
+    },
+    {
+      "file": "img-18.png",
+      "slide": 8,
+      "ext": "png",
+      "bytes": 15037
+    },
+    {
+      "file": "img-19.png",
+      "slide": 9,
+      "ext": "png",
+      "bytes": 11596
+    },
+    {
+      "file": "img-20.png",
+      "slide": 10,
+      "ext": "png",
+      "bytes": 11596
+    },
+    {
+      "file": "img-21.png",
+      "slide": 11,
+      "ext": "png",
+      "bytes": 11600
+    },
+    {
+      "file": "img-22.png",
+      "slide": 12,
+      "ext": "png",
+      "bytes": 11593
+    }
+  ]
+}
