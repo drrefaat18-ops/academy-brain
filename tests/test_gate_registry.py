@@ -10,12 +10,15 @@ def test_verdict_constants():
 
 
 def test_register_adds_to_registry():
-    @gates.register("dummy-gate")
-    def _dummy(text: str) -> gates.GateResult:
-        return gates.GateResult("dummy-gate", gates.PASS, "ok", {})
+    try:
+        @gates.register("dummy-gate")
+        def _dummy(text: str) -> gates.GateResult:
+            return gates.GateResult("dummy-gate", gates.PASS, "ok", {})
 
-    assert "dummy-gate" in gates.REGISTRY
-    assert gates.REGISTRY["dummy-gate"]("x").verdict == gates.PASS
+        assert "dummy-gate" in gates.REGISTRY
+        assert gates.REGISTRY["dummy-gate"]("x").verdict == gates.PASS
+    finally:
+        gates.REGISTRY.pop("dummy-gate", None)
 
 
 def test_gate_result_rejects_invalid_verdict():

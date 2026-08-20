@@ -9,12 +9,9 @@ from __future__ import annotations
 import shutil
 import sys
 
-PROVIDER_COMMANDS: dict[str, str] = {
-    "claude": "claude",
-    "codex": "codex",
-    "gemini": "gemini",
-    "hermes": "hermes",
-}
+from swarm.paths import PROVIDERS
+
+PROVIDER_COMMANDS: dict[str, str] = {name: name for name in sorted(PROVIDERS)}
 
 
 def probe(name: str, which=shutil.which) -> dict:
@@ -28,7 +25,7 @@ def report(results: list[dict]) -> str:
     """Human-readable reachability table."""
     lines = ["provider   status    path"]
     for r in results:
-        status = "OK" if r["reachable"] else "MISSING"
+        status = "ON PATH" if r["reachable"] else "MISSING"
         lines.append(f"{r['name']:<10} {status:<9} {r['path'] or '-'}")
     return "\n".join(lines)
 

@@ -1,7 +1,7 @@
 import scaffold_vault
 
 
-def test_creates_all_ten_stage_dirs(tmp_path):
+def test_creates_all_stage_dirs(tmp_path):
     created = scaffold_vault.scaffold(tmp_path)
     assert len(created) == len(scaffold_vault.STAGE_DIRS)
     for name in scaffold_vault.STAGE_DIRS:

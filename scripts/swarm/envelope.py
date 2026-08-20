@@ -7,10 +7,10 @@ from dataclasses import dataclass
 
 import yaml
 
+from swarm.gates import _VALID as VALID_VERDICT
 from swarm.paths import validate_session_id
 
 VALID_STATUS = frozenset({"pending", "complete", "failed", "gated"})
-VALID_VERDICT = frozenset({"PASS", "FAIL", "UNVERIFIED"})
 
 
 @dataclass(frozen=True)

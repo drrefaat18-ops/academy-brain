@@ -1,7 +1,7 @@
 from swarm import gates
 from swarm.gates import arabic_ratio
 
-# 70% Arabic, 30% English - should pass
+# mostly Arabic, within tolerance - should pass
 ARABIC_HEAVY = (
     "الميكروبيت كمبيوتر صغير تقدر تبرمجه بنفسك وتعمل بيه حاجات كتير جدا "
     "وتشوف النتيجة على الشاشة الصغيرة بتاعته The micro:bit is programmable"

@@ -1,8 +1,9 @@
 import doctor_providers
+from swarm.paths import PROVIDERS
 
 
 def test_covers_all_swarm_providers():
-    assert set(doctor_providers.PROVIDER_COMMANDS) == {"claude", "codex", "gemini", "hermes"}
+    assert set(doctor_providers.PROVIDER_COMMANDS) == set(PROVIDERS)
 
 
 def test_probe_reports_reachable_when_found():
@@ -25,6 +26,7 @@ def test_report_marks_missing_providers():
     text = doctor_providers.report(results)
     assert "hermes" in text
     assert "MISSING" in text
+    assert "ON PATH" in text
 
 
 def test_main_exits_nonzero_when_a_provider_is_missing():

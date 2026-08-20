@@ -33,6 +33,14 @@ SOURCE_MAP: dict[str, Path] = {
 }
 
 
+def _relative_source(sid: str) -> str:
+    """Source path relative to VAULT_ROOT, portable across machines."""
+    src = SOURCE_MAP.get(sid)
+    if src is None:
+        return ""
+    return src.relative_to(VAULT_ROOT).as_posix()
+
+
 def render_digest(result: DigestResult, sid: str) -> str:
     """Build the digest document: envelope plus markdown body."""
     env = envelope.Envelope(
@@ -40,8 +48,8 @@ def render_digest(result: DigestResult, sid: str) -> str:
         stage="digest",
         owner="script",
         status="gated" if result.warnings else "complete",
-        inputs=(str(SOURCE_MAP.get(sid, "")),),
-        reads_allowed=("00-contracts/**", f"10-digest/{sid}.*"),
+        inputs=(_relative_source(sid),),
+        reads_allowed=("00-contracts/**", f"10-digest/{sid}.*", f"10-digest/_assets/{sid}/**"),
     )
 
     lines: list[str] = [f"# {sid}", ""]

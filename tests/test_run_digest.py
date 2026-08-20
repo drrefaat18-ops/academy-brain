@@ -20,7 +20,7 @@ def test_render_digest_produces_parseable_envelope():
         slides=[Slide(1, "What is a micro:bit?", "A tiny computer.", "Ask first.")],
         images=[{"file": "img-01.png", "slide": 1, "ext": "png", "bytes": 70}],
     )
-    text = render = run_digest.render_digest(result, "L1-s1")
+    text = run_digest.render_digest(result, "L1-s1")
     env, body = envelope.parse(text)
 
     assert env.id == "L1-s1"

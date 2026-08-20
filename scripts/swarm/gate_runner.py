@@ -12,8 +12,7 @@ from pathlib import Path
 
 import yaml
 
-from swarm import gates
-from swarm.gates import arabic_ratio, boundary_check, brand_palette, cite_filter  # noqa: F401
+from swarm import gates, paths
 from swarm.paths import validate_session_id
 
 
@@ -59,7 +58,8 @@ def write_receipt(sid: str, results: list[gates.GateResult], out_dir: Path) -> P
             for r in results
         ],
     }
-    path = out_dir / f"{sid}.gates.yaml"
+    path = paths.receipt_path(sid, "gates")
+    path = out_dir / path.name
     path.write_text(
         yaml.safe_dump(payload, sort_keys=False, allow_unicode=True), encoding="utf-8"
     )

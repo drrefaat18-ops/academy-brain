@@ -33,7 +33,11 @@ def check(text: str) -> GateResult:
         return GateResult("cite-filter", UNVERIFIED, "payload is not valid JSON", {})
 
     kept, dropped = filter_issues(payload)
-    evidence = {"kept": len(kept), "dropped": len(dropped)}
+    evidence = {
+        "kept": len(kept),
+        "dropped": len(dropped),
+        "dropped_locs": [i.get("loc") for i in dropped],
+    }
 
     if not kept and dropped:
         return GateResult(
