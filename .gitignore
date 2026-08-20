@@ -17,3 +17,9 @@ desktop.ini
 Thumbs.db
 .DS_Store
 .superpowers/
+
+# python venv
+.venv/
+uv.lock
+__pycache__/
+.pytest_cache/
