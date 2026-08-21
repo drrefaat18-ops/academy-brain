@@ -11,7 +11,7 @@
 Two goals of equal weight:
 
 1. **Product.** Rebuild the Techno Square Micro:bit course (Level 1 + Level 2) from existing material, improving both content accuracy and pedagogy. Not a re-skin — a genuine content upgrade.
-2. **Capability.** Owner learns cross-provider agentic swarm (Claude + Codex + Gemini + Hermes), as opposed to single-provider swarm which he already does.
+2. **Capability.** Owner learns cross-provider agentic swarm (Claude + Codex + OpenCode + Hermes), as opposed to single-provider swarm which he already does.
 
 ### Non-goals
 
@@ -56,7 +56,7 @@ These are stated by the owner and override design preference.
 | --- | --- | --- | --- |
 | Session deck | 14 | NBLM MCP via Claude | NBLM caps at ~21 slides/generation → split and merge |
 | Home Summary | 14 | NBLM MCP via Claude | 3 slides/session, session 7 = 2 → **20 slides per level** |
-| Trainer guide | 2 | Gemini | **Per level**, PDF, Techno Square theme |
+| Trainer guide | 2 | Antigravity (manual, owner-run) | **Per level**, PDF, Techno Square theme. No headless CLI — owner runs it by hand in the Antigravity IDE from a Claude-authored prompt. |
 
 **Change from the AI course pipeline:** trainer guide moves from per-session to per-level PDF; Home Summary is added as a per-session student take-home.
 
@@ -72,12 +72,12 @@ These are stated by the owner and override design preference.
 | --- | --- | --- |
 | DIGEST | `digest_office.py` + Codex gate | Mechanical; LLMs add nothing to XML extraction |
 | PROVENANCE | Hermes | Web toolsets; proven in this role on the AI course |
-| RESEARCH | Hermes + Codex + Gemini (3-way) | Different providers surface different sources |
-| REFINE | Codex + Gemini + Hermes (3-way) | Highest-judgment stage; Claude excluded so the judge is not also a contestant |
+| RESEARCH | Hermes + Codex + OpenCode (3-way) | Different providers surface different sources |
+| REFINE | Codex + OpenCode + Hermes (3-way) | Highest-judgment stage; Claude excluded so the judge is not also a contestant |
 | JUDGE / REFUTE | Claude | Does not compete in the stages it judges |
 | QA | Haiku + deterministic scripts | Checklist is pass/fail, not opinion |
 | LOCALIZE | Claude only | Only provider trusted with Egyptian-colloquial Arabic |
-| GENERATE | NBLM via Claude; Gemini for PDFs | Renderers, not reasoners |
+| GENERATE | NBLM via Claude; Antigravity (manual) for trainer-guide PDFs | Renderers, not reasoners. Antigravity has no headless CLI — owner runs it manually from a Claude-authored prompt |
 
 Claude is deliberately excluded from **both** fan-out stages because it performs the merge and the judging. A provider must not both compete and adjudicate in the same stage. With no human domain review (C1), the judge is the load-bearing component of the quality model and must be impartial. Claude's pedagogical strength is applied at JUDGE, REFUTE, and LOCALIZE instead.
 
@@ -85,7 +85,7 @@ Claude is deliberately excluded from **both** fan-out stages because it performs
 
 Brain OS mandates literal **30% English / 70% Arabic**, Egyptian colloquial, simple register, RTL-correct.
 
-Codex, Gemini, and Hermes are materially weaker at colloquial Egyptian Arabic than Claude. Therefore **Arabic never enters the swarm.** All fan-out stages operate in structured English — pedagogy, sequencing, critiques, citations. A single Claude localisation pass (S5b) converts approved English content into 30/70 bilingual copy, gated by `arabic_ratio.py`.
+Codex, OpenCode, and Hermes are materially weaker at colloquial Egyptian Arabic than Claude. Therefore **Arabic never enters the swarm.** All fan-out stages operate in structured English — pedagogy, sequencing, critiques, citations. A single Claude localisation pass (S5b) converts approved English content into 30/70 bilingual copy, gated by `arabic_ratio.py`.
 
 This removes the weakest link rather than scoring it, and keeps the 3-way fan-out honest.
 
@@ -196,15 +196,15 @@ D:\vault\Microbit\
 │     _assets\L1-s1\img-01.png + manifest.json
 ├── 20-provenance\         Hermes
 ├── 30-research\
-│     _lanes\T01\{hermes,codex,gemini}.json
+│     _lanes\T01\{hermes,codex,opencode}.json
 │     T01.md … T06.md         merged
 ├── 40-critique\
-│     L1-s1\{codex,gemini,hermes}.json
+│     L1-s1\{codex,opencode,hermes}.json
 ├── 50-patch\              judge output: merged change-set
 ├── 55-refuted\            refuter verdicts
 ├── 60-approved\           canonical English content, post-QA
 ├── 70-localized\          bilingual 30/70 — Claude only
-├── 80-generation\         NBLM prompts, Gemini briefs, rendered output
+├── 80-generation\         NBLM prompts, Antigravity trainer-guide prompts (manual), rendered output
 └── 90-receipts\           gate verdicts, token accounting, divergence, escalations
 ```
 
@@ -220,7 +220,7 @@ Fan-out stages write to separate lane files whose paths do not intersect:
 
 ```
 40-critique/L1-s3/codex.json     only Codex writes
-40-critique/L1-s3/gemini.json    only Gemini writes
+40-critique/L1-s3/opencode.json  only OpenCode writes
 40-critique/L1-s3/hermes.json    only Hermes writes
 50-patch/L1-s3.md                only the judge (Claude) writes
 ```
@@ -245,7 +245,7 @@ run: wf_abc123
 ---
 ```
 
-`reads_allowed` makes agent scope declared rather than discovered — the primary token-efficiency lever. An agent reads one session's files plus the frozen contracts. Never the vault.
+`reads_allowed` makes agent scope declared rather than discovered — the primary token-efficiency lever. An agent reads one session's files plus the frozen contracts. Never the vault. `00-contracts/**` always includes `agent-memory.md`, the shared second-brain for every provider on this job — provider quirks, pipeline decisions, and schema gotchas already learned. Every dispatch prompt should point at it explicitly, not rely on agents to find it inside `00-contracts/**` unprompted.
 
 ### 8.3 Single source of truth
 
@@ -330,7 +330,7 @@ Approved English content becomes 30/70 bilingual copy. Gated by `arabic_ratio.py
 
 ### S6 · GENERATE — deferred
 
-Runs only after all 14 sessions clear S5, and only after the owner wires NBLM MCP. Session decks and Home Summaries via NBLM; trainer guides via Gemini. The ~21-slide NBLM cap requires split-and-merge for session decks; the 20-slide Home Summary fits a single generation.
+Runs only after all 14 sessions clear S5, and only after the owner wires NBLM MCP. Session decks and Home Summaries via NBLM; trainer guides via Antigravity, run manually by the owner from a Claude-authored prompt (Antigravity has no headless CLI). The ~21-slide NBLM cap requires split-and-merge for session decks; the 20-slide Home Summary fits a single generation.
 
 ### Capstone handling
 
@@ -372,10 +372,11 @@ Ruflo's control flow is model-driven, which creates a risk that an agent skips a
 | Provider | Invocation | Adapter skill |
 | --- | --- | --- |
 | Codex | `codex exec` | `codex-delegate` (installed) |
-| Gemini | `gemini -p` | `gemini-delegate` (installed; requires GEMINI_API_KEY or Google login) |
+| OpenCode | `opencode run -m <model>` | direct CLI call (`opencode-delegate` skill is for code-implementation delegation with diff review, not a fit for single-JSON research lanes — invoked directly instead) |
 
 Codex requires a trusted git directory; invoke as `codex exec --skip-git-repo-check "<prompt>" < /dev/null` from the vault root. Verified working 2026-08-20.
-| Gemini | `gemini -p` | `gemini-delegate` (installed) |
+
+OpenCode has no default model — a bare `opencode run` errors — so every call passes `-m opencode/hy3-free` (opencode's own free-tier model, no separate API key needed, distinct from `GEMINI_API_KEY`). Free tier is fragile under load like Hermes's Nous Portal tier: **sequential calls only, never parallel.**
 | Hermes | `hermes -z "<prompt>" --skills … -t …` | **`hermes-delegate` (must be written)** |
 
 Hermes is installed at `C:\Users\ET\AppData\Local\hermes\hermes-agent\venv\Scripts\hermes` and supports non-interactive `-z`, `--skills`, `-t` toolsets, and provider/model selection.
@@ -397,7 +398,7 @@ ethos-v2/
     stage-contracts.md    per-stage input/output/gate definitions
     kids-track-rules.md   adult→kids reversals, explicit
     qa-gates.md           each gate: what it catches, what it cannot
-    generation.md         NBLM + Gemini specifics, 21-slide workaround
+    generation.md         NBLM specifics + Antigravity manual trainer-guide workflow, 21-slide workaround
   scripts/                deterministic gates
 ```
 

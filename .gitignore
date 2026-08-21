@@ -23,3 +23,19 @@ Thumbs.db
 uv.lock
 __pycache__/
 .pytest_cache/
+
+# session temp / scratch
+.tmp-council/
+.tmp-visual-qa/
+test-results/
+nul
+
+# ruflo runtime state
+.claude-flow/daemon.pid
+.claude-flow/daemon-state.json
+.claude-flow/metrics/
+.claude-flow/system/
+.claude-flow/harness-active-policy.json
+
+# agent fan-out logs
+.claude/skills/**/_s0_*.log
