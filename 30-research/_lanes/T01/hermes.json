@@ -1,0 +1,36 @@
+{
+  "cluster": "T01",
+  "provider": "hermes",
+  "claims": [
+    {
+      "claim": "micro:bit's published lesson plans embed paired 'support' and 'stretch' differentiation notes in each short lesson, so a single 45-60 minute session can scaffold struggling learners and extend advanced ones without a second plan.",
+      "source": "https://microbit.org/teach/lessons/step-counter/",
+      "applies_to": ["L1-s1", "L1-s2", "L1-s3", "L1-s4", "L1-s5", "L1-s6"]
+    },
+    {
+      "claim": "For primary-aged (8-11) learners who struggle, micro:bit lessons rely on teacher-led scaffolding plus a step-by-step tutorial or a pre-built 'remix' project so they still reach the core forever-loop + show-string/icon outcome.",
+      "source": "https://microbit.org/teach/lessons/",
+      "applies_to": ["L1-s1", "L1-s2", "L1-s3"]
+    },
+    {
+      "claim": "micro:bit lessons give advanced learners an 'Extend' phase with open-ended challenges (e.g. change the pause timing, add a second animation, or combine inputs) instead of capping the task, keeping one lesson open-ended at the top.",
+      "source": "https://microbit.org/projects/make-it-code-it/beating-heart/",
+      "applies_to": ["L1-s2", "L1-s3", "L1-s5", "L1-s6"]
+    },
+    {
+      "claim": "Within an if/then + shake + random lesson, stretch is delivered by remixing the core program (adding random outcomes or new gesture handlers) while the support tier keeps a single-branch if/then skeleton the pupil can complete.",
+      "source": "https://microbit.org/teach/lessons/rock-paper-scissors/",
+      "applies_to": ["L1-s5", "L1-s6"]
+    },
+    {
+      "claim": "CS-education guidance for primary block coding favours 'low floor, high ceiling' single-lesson tasks so every pupil meets the objective yet advanced pupils have room to extend - the same pattern micro:bit applies via its support/stretch notes.",
+      "source": "MID:principle-low-floor-high-ceiling",
+      "applies_to": ["L1-s1", "L1-s2", "L1-s3", "L1-s4", "L1-s5", "L1-s6"]
+    },
+    {
+      "claim": "The Techno Square repackaging of these micro:bit lessons dropped the upstream support/stretch differentiation (together with assessment and answer key), leaving a gap the kids-track intro unit must restore to serve mixed-ability 8-11 classrooms.",
+      "source": "https://microbit.org/teach/lessons/",
+      "applies_to": ["L1-s1", "L1-s2", "L1-s3", "L1-s4", "L1-s5", "L1-s6"]
+    }
+  ]
+}

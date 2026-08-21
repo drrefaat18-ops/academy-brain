@@ -1,0 +1,41 @@
+{
+  "cluster": "T03",
+  "provider": "hermes",
+  "claims": [
+    {
+      "claim": "The 00-contracts/ directory contains only topology.md and no contract prescribing answer-key or worked-solution block conventions, so canonical MakeCode solution conventions for these sessions must be derived from the upstream microbit.org lessons referenced in provenance rather than from any local contract.",
+      "source": "MID:topology",
+      "applies_to": ["L1-s1", "L1-s2", "L1-s4", "L1-s5", "L1-s6"]
+    },
+    {
+      "claim": "L1-s1 (name badge), L1-s2 (beating heart), L1-s4 (step counter), L1-s5 (nightlight) and L1-s6 (rock-paper-scissors) all list `answer_key` under `missing:` in their provenance, meaning no formal worked-solution/answer-key artifact was carried from upstream into the Techno Square decks.",
+      "source": "MID:L1-s1",
+      "applies_to": ["L1-s1", "L1-s2", "L1-s4", "L1-s5", "L1-s6"]
+    },
+    {
+      "claim": "For the beating-heart (L1-s2) canonical solution, the provenance delta documents that a 500 ms pause is taught while the upstream project default is ~100 ms, so an answer key should accept a pause-based heartbeat (show icon -> pause -> show icon) and note the timing convention as a configurable detail rather than a right/wrong criterion.",
+      "source": "MID:L1-s2",
+      "applies_to": ["L1-s2"]
+    },
+    {
+      "claim": "For the step counter (L1-s4) canonical solution, the provenance delta records an explicit teacher emphasis to 'set variables to a known value at the start', so a correct answer key requires initializing the `steps` variable (e.g. on start) before the shake-increment handler, and the common kid mistake an answer key should flag is forgetting to initialize the variable, yielding an undefined or carried-over count.",
+      "source": "MID:L1-s4",
+      "applies_to": ["L1-s4"]
+    },
+    {
+      "claim": "For the nightlight (L1-s5) canonical solution, the provenance delta states the real program is only a light-level if/then plus clear-screen and flags that the deck's 'examine the code' slide erroneously conflates it with the step-counter's shake handler and `steps` variable — a documented misconception an answer key must explicitly correct.",
+      "source": "MID:L1-s5",
+      "applies_to": ["L1-s5"]
+    },
+    {
+      "claim": "For rock-paper-scissors (L1-s6) the provenance records that upstream's answer-key/worked-solution guidance and success criteria were dropped in the deck, so the canonical conventions (shake/button trigger -> random pick -> show icon) must be re-sourced from the upstream microbit.org lesson rather than assumed present locally.",
+      "source": "MID:L1-s6",
+      "applies_to": ["L1-s6"]
+    },
+    {
+      "claim": "Across the L1 sessions only L1-s3 (emotion badge) carries any answer content and even that is merely informal 'model answers in slide 14 speaker notes' with no formal assessment instrument or differentiation, so none of L1-s1/s2/s4/s5/s6 can inherit a standardized answer-key format and a convention must be authored from scratch.",
+      "source": "MID:L1-s3",
+      "applies_to": ["L1-s1", "L1-s2", "L1-s4", "L1-s5", "L1-s6"]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{"provider":"opencode","session":"L1-s1","lanes":["arabic-register","parent-summary","cognitive-load","spec-clarity"],
+"findings":[
+{"lens":"arabic-register","severity":"high","slide":"15","issue":"'زوج' reads as 'husband' in Egyptian colloquial, not 'a pair of students'","status":"ACCEPTED - fixed to 'كل اتنين'"},
+{"lens":"arabic-register","severity":"medium","slide":"6","issue":"objectives phrased in trainer voice (أشرح) not student voice","status":"ACCEPTED - restored أقدر"},
+{"lens":"arabic-register","severity":"low","slide":"9","issue":"two verbs run together ambiguously","status":"ACCEPTED - added connector"},
+{"lens":"parent-summary","severity":"none","issue":"no findings - summary passed clean","status":"PASS"},
+{"lens":"cognitive-load","severity":"medium","slide":"7","issue":"four MakeCode terms introduced at once","status":"ACCEPTED - split into two slides; corroborated by codex"},
+{"lens":"cognitive-load","severity":"medium","slide":"8","issue":"blocks shown before slide 9 defines them","status":"REJECTED - predicting from unfamiliar code is the deliberate pedagogy of the beat"},
+{"lens":"cognitive-load","severity":"medium","slide":"4","issue":"'algorithm' introduced then orphaned","status":"REJECTED - revisited in objectives and in the home-summary mini activity"},
+{"lens":"cognitive-load","severity":"low","slide":"5","issue":"'output' never tied back to student's own work","status":"ACCEPTED - added callback on the success slide"},
+{"lens":"spec-clarity","severity":"medium","slide":"7","issue":"'arrows pointing to four areas' is an overlay instruction with no asset","status":"ACCEPTED - two annotated assets now specified in SOURCES.md"},
+{"lens":"spec-clarity","severity":"medium","slide":"15","issue":"escaped quotes may render literally","status":"REJECTED - artifact of shell interpolation in the audit prompt, not present in the file"},
+{"lens":"spec-clarity","severity":"low","slide":"16","issue":"redundant logo asset line","status":"REJECTED - slides 1 and 17 bookend deliberately"},
+{"lens":"spec-clarity","severity":"low","slide":"6","issue":"objectives slide had no image binding, would render bare","status":"ACCEPTED - added visual binding"}
+]}
