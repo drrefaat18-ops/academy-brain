@@ -33,7 +33,7 @@ def test_assets_dir_is_per_session():
 def test_lane_paths_never_collide_across_providers():
     lanes = {
         paths.lane_path("40-critique", "L1-s3", provider)
-        for provider in ("codex", "gemini", "hermes")
+        for provider in ("codex", "opencode", "hermes")
     }
     assert len(lanes) == 3
 

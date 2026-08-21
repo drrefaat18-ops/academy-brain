@@ -17,6 +17,7 @@ STAGE_DIRS: tuple[str, ...] = (
     "55-refuted",
     "60-approved",
     "70-localized",
+    "75-bundle",
     "80-generation",
     "90-receipts",
 )
@@ -27,18 +28,19 @@ TOPOLOGY: dict[str, dict] = {
     "20-provenance": {"owner": "hermes", "fanout": (), "writes": "one file per session"},
     "30-research": {
         "owner": "claude",
-        "fanout": ("hermes", "codex", "gemini"),
+        "fanout": ("hermes", "codex", "opencode"),
         "writes": "_lanes/<cluster>/<provider>.json, merged to <cluster>.md",
     },
     "40-critique": {
         "owner": "claude",
-        "fanout": ("codex", "gemini", "hermes"),
+        "fanout": ("codex", "opencode", "hermes"),
         "writes": "<session>/<provider>.json",
     },
     "50-patch": {"owner": "codex", "reviewer": "claude", "fanout": (), "writes": "one file per session"},
     "55-refuted": {"owner": "codex", "reviewer": "claude", "fanout": (), "writes": "one file per session"},
     "60-approved": {"owner": "codex", "reviewer": "claude", "fanout": (), "writes": "one file per session"},
     "70-localized": {"owner": "claude", "fanout": (), "writes": "one file per session"},
+    "75-bundle": {"owner": "claude", "fanout": (), "writes": "one folder per session: trainer-guide.md, decisions.md, assets/, SOURCES.md"},
     "80-generation": {"owner": "claude", "fanout": (), "writes": "prompts and rendered output (NotebookLM MCP is claude-only)"},
     "90-receipts": {"owner": "script", "fanout": (), "writes": "<session>.<gate>.yaml"},
 }

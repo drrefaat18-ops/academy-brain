@@ -15,7 +15,7 @@ SESSION_IDS: tuple[str, ...] = tuple(
     f"L{level}-s{n}" for level in (1, 2) for n in range(1, 8)
 )
 
-PROVIDERS: frozenset[str] = frozenset({"claude", "codex", "gemini", "hermes"})
+PROVIDERS: frozenset[str] = frozenset({"claude", "codex", "opencode", "hermes"})
 
 _SESSION_RE = re.compile(r"^L[12]-s[1-7]$")
 

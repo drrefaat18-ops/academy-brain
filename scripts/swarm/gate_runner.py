@@ -12,7 +12,7 @@ from pathlib import Path
 
 import yaml
 
-from swarm import gates, paths
+from swarm import gates, paths, prepare
 from swarm.paths import validate_session_id
 
 
@@ -74,12 +74,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
 
-    text = args.target.read_text(encoding="utf-8")
-    results = run_gates(text, args.gates)
+    raw = args.target.read_text(encoding="utf-8")
+    text, audience = prepare.learner_text(raw)
+    run, skipped = prepare.applicable(args.gates, audience)
+
+    results = run_gates(text, run)
+    # A gate that does not apply is recorded, never silently dropped.
+    for name in skipped:
+        results.append(
+            gates.GateResult(
+                name,
+                gates.UNVERIFIED,
+                f"not applicable to {audience}-facing artifact",
+            )
+        )
+    results.sort(key=lambda r: args.gates.index(r.gate))
     path = write_receipt(args.session_id, results, args.out)
 
     verdict = overall_verdict(results)
-    print(f"{verdict} — receipt written to {path}")
+    print(f"{verdict} [{audience}] — receipt written to {path}")
     return 0 if verdict == gates.PASS else 1
 
 
