@@ -122,9 +122,11 @@ enough to matter, and the error is only visible in the classroom.
 
 ---
 
-## 3. Worked example — L1-s1 (micro:bit), for shape only
+## 3. Worked example — from this vault's first course, for shape only
 
-Domain-specific. Reproduce the *structure*, not the content.
+The example below is NOT from your course. It is here so the three rungs
+(lifecycle, content, scope) have a concrete shape. Reproduce the *structure*,
+never the content, and delete this section once your own ladder replaces it.
 
 | # | Seeded program | What they see | Fix | Class |
 |---|---|---|---|---|

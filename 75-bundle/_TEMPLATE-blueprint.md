@@ -4,7 +4,7 @@ level: "<L1>"
 session: "<s1>"
 status: draft-awaiting-owner-approval
 last_updated: YYYY-MM-DD
-track: "<course track slug, e.g. kids-microbit / kids-ev3>"
+track: "<course track slug, e.g. kids-ev3>"
 age_band: "UNCONFIRMED - owner must fill"
 duration_minutes: 120
 ---

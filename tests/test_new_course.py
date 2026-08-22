@@ -1,0 +1,251 @@
+"""Lane E: instantiating an empty course must produce a working, EMPTY course.
+
+The plan calls for proof rather than grep: create the course, load its manifest
+back, import the copied modules, derive paths from the new manifest, and only
+then check that no trace of the source course's naming survived.
+
+The failure this suite exists to prevent is a scaffolder that reports success
+having written a manifest nobody validated, or having copied one course's
+content into the next one.
+"""
+
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+from swarm import config, new_course
+
+VAULT = Path(__file__).resolve().parents[1]
+
+EV3_SEED = new_course.Seed(
+    slug="kids-ev3",
+    name="Techno Square EV3 kids track",
+    levels=(1, 2),
+    sessions_per_level=8,
+    providers=("claude", "codex"),
+    artifact_schedule=(True,) * 7 + (False,),
+    asset_ref_pattern=r"`((?:shot|render)[A-Za-z0-9_.\-]*\.(?:png|svg))`",
+    asset_source_files=("slides-source.md",),
+    expect_references=True,
+)
+
+
+@pytest.fixture
+def course(tmp_path):
+    target = tmp_path / "ev3"
+    cfg = new_course.create(EV3_SEED, target, VAULT)
+    return target, cfg
+
+
+# --------------------------------------------------------------------------
+# it produces a real, loadable course
+# --------------------------------------------------------------------------
+
+
+def test_manifest_is_loaded_back_not_merely_written(course):
+    target, cfg = course
+
+    assert cfg == config.load_course(target)
+    assert cfg.levels == (1, 2)
+    assert cfg.sessions_per_level == 8
+    assert cfg.providers == frozenset({"claude", "codex"})
+    assert cfg.produces_artifacts("L2-s7") is True
+    assert cfg.produces_artifacts("L2-s8") is False
+
+
+def test_discovery_comes_from_the_new_manifest(course):
+    target, cfg = course
+    d = cfg.asset_discovery
+
+    assert d.expect_references is True
+    assert d.source_files == ("slides-source.md",)
+    assert d.ref.search("`shot-arm.png`")
+    assert not d.ref.search("`img-01.png`"), "the source course's naming must not carry over"
+
+
+def test_paths_bind_to_the_new_course(course):
+    from swarm import paths
+
+    target, _ = course
+    bound = paths.for_root(target)
+
+    assert bound.SESSION_IDS[0] == "L1-s1"
+    assert len(bound.SESSION_IDS) == 16
+    assert bound.digest_path("L1-s1") == target / "10-digest" / "L1-s1.md"
+    with pytest.raises(ValueError, match="does not produce artifacts"):
+        bound.digest_path("L2-s8")
+
+
+def test_topology_is_derived_from_the_manifest(course):
+    target, _ = course
+    text = (target / "topology.md").read_text(encoding="utf-8")
+
+    assert "| L1-s1 | yes |" in text
+    assert "| L2-s8 | no |" in text
+    assert "claude, codex" in text
+
+
+def test_stage_tree_exists_and_is_empty(course):
+    target, _ = course
+
+    for rel in new_course.STAGE_DIRS:
+        d = target / rel
+        assert d.is_dir(), rel
+        if rel == "75-bundle":  # carries the templates, which are not content
+            assert {p.name for p in d.iterdir()} <= {
+                "_TEMPLATE-blueprint.md",
+                "_TEMPLATE-debugging-lab.md",
+            }
+        else:
+            assert list(d.iterdir()) == [], f"{rel} must start empty"
+
+
+def test_no_course_content_is_copied(course):
+    """The scaffolder copies code and templates. Never lessons, assets or receipts."""
+    target, _ = course
+
+    assert not (target / "10-digest" / "L1-s1.md").exists()
+    assert not (target / "30-research").glob("T0*.md").__iter__().__next__() if False else True
+    assert list((target / "30-research").iterdir()) == []
+    assert list((target / "90-receipts").iterdir()) == []
+
+
+def test_copied_modules_import_from_the_new_tree(course, tmp_path):
+    """Copied code must run there, not just exist there."""
+    target, _ = course
+    proc = subprocess.run(
+        [sys.executable, "-c", "import swarm.config, swarm.check_assets, swarm.new_course"],
+        cwd=target,
+        env={"PYTHONPATH": str(target / "scripts"), "PATH": ""},
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+
+
+def test_generated_course_carries_no_trace_of_the_source_course(course):
+    """The plan's grep, run last — after the semantic checks, not instead of them."""
+    target, _ = course
+    import re
+
+    pattern = re.compile(r"micro:?bit|makecode", re.I)
+    offenders = []
+    for path in target.rglob("*"):
+        if not path.is_file() or path.suffix in {".pyc", ".png", ".gif", ".jpg", ".pdf"}:
+            continue
+        if "scripts" in path.parts or "tests" in path.parts:
+            continue  # shared code and its own tests legitimately name the old course
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        if pattern.search(text):
+            offenders.append(str(path.relative_to(target)))
+
+    assert offenders == [], f"source-course naming leaked into: {offenders}"
+
+
+# --------------------------------------------------------------------------
+# it refuses rather than guesses
+# --------------------------------------------------------------------------
+
+
+def test_refuses_a_non_empty_target(tmp_path):
+    target = tmp_path / "taken"
+    target.mkdir()
+    (target / "someones-work.md").write_text("x", encoding="utf-8")
+
+    with pytest.raises(new_course.ScaffoldError, match="not empty"):
+        new_course.create(EV3_SEED, target, VAULT)
+
+
+def test_refuses_a_target_inside_the_source_vault(tmp_path):
+    """Two manifests above one bundle: discovery resolves the nearer one."""
+    with pytest.raises(new_course.ScaffoldError, match="inside the source vault"):
+        new_course.create(EV3_SEED, VAULT / "80-generation" / "nested", VAULT)
+
+
+@pytest.mark.parametrize("slug", ["Kids-EV3", "kids ev3", "1course", "", "x"])
+def test_refuses_a_malformed_slug(tmp_path, slug):
+    seed = new_course.Seed(**{**EV3_SEED.__dict__, "slug": slug})
+    with pytest.raises(new_course.ScaffoldError, match="slug"):
+        new_course.create(seed, tmp_path / "c", VAULT)
+
+
+def test_refuses_a_schedule_that_does_not_cover_every_session(tmp_path):
+    seed = new_course.Seed(**{**EV3_SEED.__dict__, "artifact_schedule": (True, False)})
+    with pytest.raises(new_course.ScaffoldError, match="one per session"):
+        new_course.create(seed, tmp_path / "c", VAULT)
+
+
+def test_an_invalid_pattern_fails_at_creation_not_at_first_audit(tmp_path):
+    """A two-group pattern loads as a config error. The scaffolder must not
+    report success and leave the defect for whoever runs the first asset gate."""
+    seed = new_course.Seed(
+        **{**EV3_SEED.__dict__, "asset_ref_pattern": r"`((shot)[^`]+\.png)`"}
+    )
+    with pytest.raises(new_course.ScaffoldError, match="does not load"):
+        new_course.create(seed, tmp_path / "c", VAULT)
+
+
+# --------------------------------------------------------------------------
+# the CLI is the whole interface
+# --------------------------------------------------------------------------
+
+
+def test_cli_creates_a_course(tmp_path, capsys):
+    target = tmp_path / "cli-course"
+    rc = new_course.main(
+        [
+            "new_course.py",
+            "kids-ev3",
+            str(target),
+            "--name",
+            "EV3",
+            "--levels",
+            "1",
+            "--sessions-per-level",
+            "4",
+            "--no-artifact-sessions",
+            "4",
+            "--providers",
+            "claude",
+            "--asset-ref-pattern",
+            r"`(shot-[^`]+\.png)`",
+            "--asset-source-files",
+            "slides-source.md",
+            "--source",
+            str(VAULT),
+        ]
+    )
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "4 session(s), 3 producing artifacts" in out
+    assert "No course content was copied" in out
+    assert config.load_course(target).sessions_per_level == 4
+
+
+def test_cli_reports_a_refusal_as_a_nonzero_exit(tmp_path, capsys):
+    target = tmp_path / "taken"
+    target.mkdir()
+    (target / "x").write_text("x", encoding="utf-8")
+
+    rc = new_course.main(
+        [
+            "new_course.py",
+            "kids-ev3",
+            str(target),
+            "--asset-ref-pattern",
+            r"`(shot-[^`]+\.png)`",
+            "--asset-source-files",
+            "slides-source.md",
+            "--source",
+            str(VAULT),
+        ]
+    )
+
+    assert rc == 2
+    assert "FAIL" in capsys.readouterr().err

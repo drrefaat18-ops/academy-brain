@@ -161,7 +161,7 @@ logo, no TATA, no course assets. If the MCP lacks a capability, check the CLI
 before escalating.
 
 **Run the CLI with `--active`, or clear `VIRTUAL_ENV` first.** Invoked from the
-vault root it inherits `VIRTUAL_ENV=D:ault\Microbit\.venv`, which shadows the
+vault root it inherits that vault's own `VIRTUAL_ENV=<vault>/.venv`, which shadows the
 server's own environment. Same shadowing broke the MCP registration once already.
 
 ## 2. Trainer Guide is mandatory and comes FIRST
@@ -226,8 +226,8 @@ This is a hard boundary — the existing `trainer_boundary` gate enforces it.
 ## 7. Interaction law (EthOS v2 addition)
 
 Not in Abdeen's docs; added because upstream vendor decks tend to be video-first
-and the academy is not. It first bit on the micro:bit source decks; it is a
-standing law for every course, not a patch for that one.
+and the academy is not. It first bit on the source decks this vault started
+from; it is a standing law for every course, not a patch for one of them.
 
 A slide whose only content is a video link is a **defect**. Every such slide is
 replaced by a hands-on beat: predict -> try -> check, a build step, or a
