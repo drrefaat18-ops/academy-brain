@@ -16,6 +16,9 @@ stages:
   digest_assets: media
   provenance: sources
   receipts: audits
+asset_discovery:
+  asset_ref_pattern: '`(img-[^`]+[.]png)`'
+  asset_source_files: [slides-source.md]
 """
 
 

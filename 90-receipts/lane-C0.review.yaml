@@ -1,110 +1,110 @@
 step: C0
-builder: opencode
+builder: opencode (iterations 1-2), claude (iteration 3 — see scope note)
 reviewer: codex
 date: 2026-08-22
-iteration: 1
-verdict: BLOCKED
-graduation: DEFERRED     # reviewer said NOT YET; see graduation_note
-blocking: 4
-advisory: 1
+iteration: 3
+verdict: BLOCKED at iteration 2; fixes applied, awaiting re-review
+graduation: NOT GRANTED
 
-rung1:
-  pytest: PASS            # 131 passed at the time of review, run by claude
-  check_assets_self_check: PASS
-  cli_against_real_bundle: PASS    # 21 present, 1 to create
-  file_scope: PASS        # check_assets.py, tests/test_check_assets.py only
-  note: >
-    Reviewer could not run the suite — codex ran under -s read-only and pytest died
-    with "No usable temporary directory found". Rung 1 was therefore executed by
-    claude instead, and passed. The review is static analysis only, which is
-    recorded rather than glossed.
+scope_note: >
+  Iteration 3 was taken over by claude rather than returned to opencode. The
+  decisive finding (C0-08) required editing scripts/swarm/config.py, which is
+  lane B's file and outside C0's ownership. The matrix rule says a lane needing
+  another lane's file must STOP, so the fix could not be done inside C0 at all.
+  Integration is claude's; the takeover follows the rule rather than bypassing it.
+
+iteration_2_findings:
+  resolved_by_review:
+    - id: C0-01
+      note: signature regression gone; audit(bundle)/unused(bundle) are one-arg again.
+    - id: C0-02
+      note: definition-time binding gone for direct callers; module globals steer again.
+  blocking:
+    - id: C0-03
+      problem: no course.yaml anywhere -> silent micro:bit defaults -> PASS on an unaudited course.
+    - id: C0-04
+      problem: tests asserted the forbidden outcome (green pass on undiscovered course).
+    - id: C0-06
+      problem: manifest present but without asset_discovery -> same silent default.
+    - id: C0-07
+      problem: a typo'd source filename was skipped, turning the audit into an empty pass.
+    - id: C0-08
+      problem: >
+        two parsers for one file. check_assets accepted an asset_discovery section
+        that config.load_course rejected as an unknown field, so the documented
+        configuration broke the canonical loader.
+    - id: C0-09
+      problem: a multi-group regex makes findall() return tuples; the audit dies with TypeError.
+    - id: C0-10
+      problem: source paths were not contained; '../../other/deck.md' audits another course.
 
 verified_by_claude:
-  - finding: 2
-    result: CONFIRMED — reproduces
-    evidence: >
-      Set check_assets.REF to a `shot-*` pattern at module level, then called the
-      one-argument audit(bundle) against a bundle containing shot-arm.png. Returned
-      [] where it should have returned ['shot-arm.png']. Binding REF as a default
-      argument value freezes it at definition time, so the module-level override that
-      used to work is now silently dead.
-  - finding: 3
-    result: CONFIRMED — follows directly from the code
-    evidence: >
-      main(argv) calls audit(bundle) and unused(bundle) with no discovery arguments,
-      so the CLI still uses the micro:bit defaults. The generalisation is unreachable
-      from the only documented way to run the tool.
+  method: executed, not read
+  results:
+    - id: C0-08
+      result: CONFIRMED
+      evidence: >
+        Appended the documented asset_discovery section to a copy of the repo's own
+        course.yaml; load_course raised
+        "CourseConfigError: unknown field(s): asset_discovery".
+    - id: C0-09
+      result: CONFIRMED
+      evidence: >
+        Pattern '`((shot|render)-([^.]+)\.(png|svg))`' against a deck referencing
+        shot-arm.png raised
+        "TypeError: 'in <string>' requires string as left operand, not tuple".
+    - id: C0-07
+      result: CONFIRMED
+      evidence: "asset_source_files: [dekk.md] with a real deck.md -> exit 0, 'PASS: 0 present, 0 to create'."
+    - id: C0-06
+      result: CONFIRMED — independently found by claude before reading the review.
 
-findings:
-  - id: C0-01
-    severity: blocking
-    file: scripts/swarm/check_assets.py
-    line: 22
-    problem: audit() and unused() gained keyword-only parameters, changing the frozen public signatures.
-    claude_assessment: >
-      Technically correct against the brief, which said the signatures keep their
-      "exact current shapes". Weakest of the four on its own — keyword-only params with
-      defaults are source-compatible for every existing caller. It matters because of
-      how it was done (C0-02), not because an extra keyword is inherently wrong.
-  - id: C0-02
-    severity: blocking
-    file: scripts/swarm/check_assets.py
-    line: 25
-    problem: >
-      REF and SOURCE_FILES bound as default argument values, so they resolve at
-      definition time. Module-level overrides are silently ignored.
-    failure_scenario: >
-      Any code that configured this module the documented way — assigning
-      check_assets.REF — now runs against the micro:bit pattern and reports a clean
-      PASS on a course whose assets it never looked for.
-    required_fix: resolve discovery settings at call time, not at definition time.
-  - id: C0-03
-    severity: blocking
-    file: scripts/swarm/check_assets.py
-    line: 75
-    problem: >
-      main(argv) still calls the one-argument form, so the CLI is not generalised.
-      The lane's entire objective is unreachable from its entry point.
-    failure_scenario: >
-      A course using deck.md and shot-* prefixes is audited by
-      `python scripts/swarm/check_assets.py <bundle>`, finds zero references, and
-      exits PASS while every asset is missing. A green gate on an empty check.
-    required_fix: >
-      Resolve discovery from the course manifest so the CLI works for another course
-      without editing this file.
-  - id: C0-04
-    severity: blocking
-    file: tests/test_check_assets.py
-    line: 54
-    problem: >
-      The cross-course test exercises the newly invented keyword API, so it validates
-      the API rather than the requirement, and cannot detect C0-03.
-    required_fix: test through main(argv) — the real CLI path — against a differently-named course.
-  - id: C0-05
-    severity: advisory
-    file: tests/test_check_assets.py
-    line: 45
-    problem: >
-      Missing boundary cases: empty bundle, missing assets dir, missing source file,
-      unicode and case sensitivity, backticked code spans that look like assets, and a
-      source path escaping the bundle (../outside.md).
-    required_fix: add them, and decide-and-document whether bundle containment is enforced here.
+fixes_applied:
+  - finding: C0-08
+    action: >
+      asset_discovery moved into the canonical schema in scripts/swarm/config.py as a
+      REQUIRED field with a validated AssetDiscovery dataclass. check_assets.py's
+      duplicate parser (_manifest_section) was deleted; discovery_for() now walks up to
+      the nearest course.yaml and calls load_course. One file, one set of rules.
+  - findings: [C0-03, C0-06]
+    action: >
+      Discovery has no default and no fallback. A missing manifest raises DiscoveryError;
+      a manifest without asset_discovery is a missing-field error. Both exit 2. The
+      repo's own course.yaml now declares its micro:bit discovery explicitly, so the
+      previously implicit default is written down rather than assumed.
+  - finding: C0-07
+    action: _refs() raises DiscoveryError naming every configured source file not on disk.
+  - finding: C0-09
+    action: >
+      config.py rejects any asset_ref_pattern whose group count is not exactly 1,
+      with the group count in the message. Refused at load, not mid-audit.
+  - finding: C0-10
+    action: >
+      asset_source_files entries are validated as single file names inside the bundle;
+      absolute paths and '..' are refused at load time, so the gate cannot be aimed at
+      another course.
+  - finding: C0-04
+    action: >
+      tests/test_check_assets.py rewritten. The tests that blessed the green-pass
+      outcome now assert exit 2. 24 tests, including one per blocking finding and a
+      nearest-manifest-wins case.
 
-builder_defence_recorded_by_claude: >
-  Part of C0-03 traces to the brief, not to the builder. The original lane brief
-  explicitly forbade importing a config module, because lane B had not landed yet, and
-  offered no other channel by which the CLI could learn a course's discovery settings.
-  Within that constraint the CLI could not have been generalised. Lane B has since been
-  APPROVED, so the constraint is lifted and the fix iteration has a real channel.
-  The builder also stayed inside its file scope, kept the diff minimal, and correctly
-  reported that concurrent edits from other lanes were not its own.
+verification:
+  suite: 161 passed
+  self_checks: [check_assets, generate_session, overlay]
+  scenarios_rerun: >
+    All five reported failure scenarios were re-executed after the fix and every one
+    exits 2 with a specific diagnostic. The positive case still fails correctly on a
+    real dangling reference (exit 1).
+  real_bundle: >
+    75-bundle/L1-s1 unchanged before and after: 21 present, 1 to create, 1 unused.
+    The fix is not a behaviour change for the live course.
 
 graduation_note: >
-  Reviewer's verdict was NOT YET. Claude defers the graduation decision to the next
-  iteration rather than settling it now: three of the four blocking findings stem from
-  one root cause (definition-time binding), and one of those was partly forced by a
-  defective brief. Whether opencode graduates should be judged on how it handles a
-  brief that is not defective. The plan's rule stands either way — no shared
-  infrastructure, git surgery, or executor/overlay work until a lane is APPROVED.
-
-next: opencode fix iteration dispatched with the config channel open
+  Still NOT GRANTED, and now on evidence rather than deferral. opencode produced the
+  same class of defect twice: when discovery could not be resolved it fell back to
+  another course's naming and reported success. Iteration 1 failed open at
+  definition-time binding; iteration 2 failed open at three separate fallback
+  conditions, and its own tests asserted that failure as correct behaviour. A builder
+  whose tests bless the defect the lane exists to prevent does not get shared
+  infrastructure. Revisit on a lane where the brief is not defective.

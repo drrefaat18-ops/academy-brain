@@ -23,12 +23,26 @@ class StageDirectories:
 
 
 @dataclass(frozen=True)
+class AssetDiscovery:
+    """How this course names its assets and where they are referenced from.
+
+    Lives here rather than in check_assets.py because two parsers for one file
+    disagree eventually: the CLI accepted an ``asset_discovery`` section that
+    ``load_course`` then rejected as an unknown field.
+    """
+
+    ref: re.Pattern[str]
+    source_files: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class CourseConfig:
     levels: tuple[int, ...]
     sessions_per_level: int
     providers: frozenset[str]
     artifact_schedule: tuple[bool, ...]
     stages: StageDirectories
+    asset_discovery: AssetDiscovery
 
     def produces_artifacts(self, sid: str) -> bool:
         """Return the manifest decision for a configured session ID."""
@@ -44,9 +58,17 @@ class CourseConfig:
 
 
 _TOP_LEVEL_FIELDS = frozenset(
-    {"levels", "sessions_per_level", "providers", "artifact_schedule", "stages"}
+    {
+        "levels",
+        "sessions_per_level",
+        "providers",
+        "artifact_schedule",
+        "stages",
+        "asset_discovery",
+    }
 )
 _STAGE_FIELDS = frozenset({"digest", "digest_assets", "provenance", "receipts"})
+_DISCOVERY_FIELDS = frozenset({"asset_ref_pattern", "asset_source_files"})
 
 
 def _mapping(value: Any, field: str, source: Path) -> dict[str, Any]:
@@ -62,6 +84,64 @@ def _directory(value: Any, field: str, source: Path) -> str:
     if path.is_absolute() or len(path.parts) != 1 or value in {".", ".."}:
         raise CourseConfigError(f"{source}: {field} must be one relative directory name")
     return value
+
+
+def _asset_discovery(raw: Any, source: Path) -> AssetDiscovery:
+    data = _mapping(raw, "asset_discovery", source)
+    unknown = set(data) - _DISCOVERY_FIELDS
+    if unknown:
+        raise CourseConfigError(
+            f"{source}: unknown asset_discovery field(s): {', '.join(sorted(unknown))}"
+        )
+    missing = _DISCOVERY_FIELDS - set(data)
+    if missing:
+        names = ", ".join(f"asset_discovery.{name}" for name in sorted(missing))
+        raise CourseConfigError(f"{source}: missing field(s): {names}")
+
+    pattern = data["asset_ref_pattern"]
+    if not isinstance(pattern, str) or not pattern.strip():
+        raise CourseConfigError(
+            f"{source}: asset_discovery.asset_ref_pattern must be a non-empty regex string"
+        )
+    try:
+        ref = re.compile(pattern)
+    except re.error as exc:
+        raise CourseConfigError(
+            f"{source}: asset_discovery.asset_ref_pattern is not a valid regex: {exc}"
+        ) from exc
+    # findall() returns tuples the moment a second group appears, and every
+    # downstream comparison is filename-against-string. Refuse it here rather
+    # than let it surface as a TypeError mid-audit.
+    if ref.groups != 1:
+        raise CourseConfigError(
+            f"{source}: asset_discovery.asset_ref_pattern must have exactly one capture "
+            f"group (the filename); this one has {ref.groups}"
+        )
+
+    files_raw = data["asset_source_files"]
+    if (
+        not isinstance(files_raw, list)
+        or not files_raw
+        or len(set(files_raw)) != len(files_raw)
+    ):
+        raise CourseConfigError(
+            f"{source}: asset_discovery.asset_source_files must be a non-empty list "
+            "of unique file names"
+        )
+    for name in files_raw:
+        # A source file is read from inside the bundle. An absolute path or a
+        # ".." escape would audit a different course and report PASS on this one.
+        if not isinstance(name, str) or not name.strip():
+            raise CourseConfigError(
+                f"{source}: asset_discovery.asset_source_files entries must be non-empty names"
+            )
+        path = Path(name)
+        if path.is_absolute() or len(path.parts) != 1 or name in {".", ".."}:
+            raise CourseConfigError(
+                f"{source}: asset_discovery.asset_source_files entry {name!r} must be one "
+                "file name inside the bundle"
+            )
+    return AssetDiscovery(ref=ref, source_files=tuple(files_raw))
 
 
 def load_course(root: Path) -> CourseConfig:
@@ -144,6 +224,7 @@ def load_course(root: Path) -> CourseConfig:
         artifact_schedule=tuple(
             schedule_raw[f"s{session}"] for session in range(1, sessions + 1)
         ),
+        asset_discovery=_asset_discovery(data["asset_discovery"], source),
         stages=StageDirectories(
             digest=_directory(stages_raw["digest"], "stages.digest", source),
             digest_assets=_directory(stages_raw["digest_assets"], "stages.digest_assets", source),

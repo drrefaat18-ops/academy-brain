@@ -34,6 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from swarm import overlay as _overlay  # noqa: E402
 from swarm import paths  # noqa: E402
 
 VAULT = paths.VAULT_ROOT
@@ -426,6 +427,23 @@ def preflight(plan: list[Pass]) -> list[str]:
 # --------------------------------------------------------------------------
 
 
+def _composite(deck: Path, ps: Pass) -> None:
+    """Overlay EVIDENCE onto the exported deck, then prove no region survived.
+
+    Reserving a blank region is half the contract; this is the other half. The
+    L1-s1 run shipped empty dashed boxes while the images sat on disk, and an
+    empty box reads to the owner as a demand for content he cannot supply.
+
+    Runs on the freshly downloaded deck AND on the skip path, because a deck
+    downloaded by an earlier run predates this step and would otherwise be
+    delivered unfilled.
+    """
+    if _overlay.find_regions(deck):
+        filled = _overlay.overlay(deck, {a.aid: a.path for a in ps.evidence})
+        print(f"  overlaid {len(filled)} region(s): {', '.join(filled)}")
+    _overlay.assert_filled(deck)
+
+
 async def _run_pass(client, ps: Pass, out_dir: Path, notebooks: dict[str, str]) -> dict:
     from notebooklm import SlideDeckFormat
 
@@ -458,6 +476,7 @@ async def _run_pass(client, ps: Pass, out_dir: Path, notebooks: dict[str, str]) 
     done = out_dir / f"{ps.key}.pdf"
     if done.is_file():
         print(f"  {ps.key} already downloaded at {done} — skipping generation")
+        _composite(done, ps)
         return {"pass": ps.key, "notebook_id": nb_id, "task_id": None, "output": str(done)}
 
     # step 5-6
@@ -485,6 +504,7 @@ async def _run_pass(client, ps: Pass, out_dir: Path, notebooks: dict[str, str]) 
         print("  wait timed out; the deck may already be done — trying download")
     await client.artifacts.download_slide_deck(nb_id, out, artifact_id=task_id)
     print(f"  downloaded {out}")
+    _composite(out, ps)
     return {"pass": ps.key, "notebook_id": nb_id, "task_id": task_id, "output": str(out)}
 
 

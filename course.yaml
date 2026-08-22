@@ -15,3 +15,13 @@ stages:
   digest_assets: _assets
   provenance: 20-provenance
   receipts: 90-receipts
+
+# Asset discovery — how this course names assets and where they are referenced.
+# Explicit rather than defaulted: a gate that falls back to another course's
+# naming finds nothing and reports PASS on a course with every asset missing.
+asset_discovery:
+  # single-quoted: YAML double quotes would eat the regex backslashes
+  asset_ref_pattern: '`((?:img|tata|technosquare)[A-Za-z0-9_.\-]*\.(?:png|gif|jpg|jpeg))`'
+  asset_source_files:
+    - slides-source.md
+    - home-summary.md

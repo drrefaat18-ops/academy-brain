@@ -58,8 +58,9 @@ ask, do not begin.
 ## Outputs
 
 Machine-checkable files, never advice. Every claim in the record shape defined
-by the skill section 1: `claim`, `source_id`, `locator`, `applicability`,
-`confidence`.
+by the skill section 1: `claim`, `status`, `applicability`, `confidence`, plus
+`source_id` and `locator` which are required when `status: SOURCED` and null
+otherwise. Omitting `status` makes SOURCED and NEEDS_SOURCING indistinguishable.
 
 ## Hard refusals
 
@@ -89,14 +90,31 @@ verdict: APPROVED | BLOCKED
 claims:
   - claim: <statement>
     status: SOURCED | NEEDS_SOURCING | UNVERIFIED | REFUTED
-    source_id: <or null>
-    locator: <or null>
+    source_id: "<required when SOURCED, else null>"
+    locator: "<required when SOURCED, else null>"
     applicability: <which kit/firmware/software — never omitted>
     confidence: high | medium | low
-review:
-  specialist: <actor>
-  reviewer: <actor — must differ from specialist>
-  refuter: <actor — required for high-severity calls>
+# approval_record and review_receipt are the canonical structures from
+# knowledge/ev3/intake-schema.yaml. A free-standing `review:` map used to appear
+# here instead, which could not express council evidence or an owner-business
+# category — a receipt that cannot represent the schema is not a receipt.
+approval_record:
+  kind: specialist_council | owner_business | physical_action_required
+  subject: <what is being approved>
+  council_evidence:          # required when kind is specialist_council
+    specialist: <actor>
+    reviewer:   <actor — MUST differ from specialist>
+    refuter:    <actor — required for high-severity calls, differs from both>
+  category: "<required when kind is owner_business; from owner_business_categories>"
+  why_not_technical: "<required when kind is owner_business>"
+review_receipt:
+  - subject_id: <what was reviewed>
+    actor:      <who reviewed — must differ from the producer>
+    role:       reviewer | refuter
+    inputs:     <what was actually read>
+    verdict:    APPROVED | BLOCKED
+    citations:  [<source_ids checked>]
+    severity_covered: <which severities this pass covered>
 holes:
   - <what is missing and what would settle it>
 ```

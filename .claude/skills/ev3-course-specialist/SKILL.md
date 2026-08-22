@@ -55,7 +55,10 @@ applicability: <which kit/firmware/software this holds for>
 confidence: high | medium | low
 ```
 
-A claim without `locator` is not a claim.
+A `SOURCED` claim without `locator` is not a claim. `NEEDS_SOURCING`,
+`UNVERIFIED` and `REFUTED` claims carry `locator: null` — that is the
+canonical schema's own shape, and demanding a locator there only invites
+an invented one.
 
 **This rule is NOT machine-enforced yet.** `scripts/swarm/gates/cite_filter.py` is the
 nearest existing mechanism, but it reads critique JSON (`issues[].cites`) and does not
@@ -177,7 +180,7 @@ one. A diagram is not a source.
 
 ## 5. Language
 
-You never author Arabic. `rubric.md` §5 forbids non-Claude Arabic. Emit English
+You never author Arabic. `00-contracts/rubric.md:59-66` (§5, non-negotiables) forbids non-Claude Arabic. Emit English
 technical content and the structural slots; Arabic text is written by Claude
 against those slots.
 
@@ -232,9 +235,22 @@ the same actor is invalid regardless of its verdict.
 Honesty note, added after adversarial review (2026-08-22). The plan says
 anti-hallucination is "enforced, not promised". **Today it is mostly promised.**
 
+**Every rule in `knowledge/ev3/intake-schema.yaml` is NOT_ENFORCED unless this
+table says otherwise.** The single partial exception is the last row. The rows
+below name the rule families explicitly rather than leaving the reader to infer
+which of them the table forgot.
+
 | Rule | Status |
 |---|---|
-| YAML in `knowledge/ev3/` parses | enforced (parser) |
+| source entry carries tier, applicability, confidence, licence | **NOT ENFORCED** |
+| status vocabulary is one of the four permitted values | **NOT ENFORCED** |
+| observation receipt fields, media hash, symptom match | **NOT ENFORCED** |
+| physical request is one of the three typed kinds | **NOT ENFORCED** |
+| approval uses only the enumerated owner-business categories | **NOT ENFORCED** |
+| specialist, reviewer and refuter are distinct actors | **NOT ENFORCED** |
+| review receipt is present for high-severity calls | **NOT ENFORCED** |
+| localisation provenance is populated and valid | **NOT ENFORCED** |
+| YAML in `knowledge/ev3/` parses | **NOT ENFORCED** — verified by hand with `yaml.safe_load`; no gate or CI step reads this directory |
 | claim card has `source_id` + `locator` when `SOURCED` | **NOT ENFORCED** — no validator exists |
 | `source_id` resolves in `source-catalog.yaml` | **NOT ENFORCED** |
 | applicability matches the academy inventory | **NOT ENFORCED** — inventory file does not exist yet |
@@ -244,7 +260,7 @@ anti-hallucination is "enforced, not promised". **Today it is mostly promised.**
 | seeded bug reproduces its stated symptom | **NOT ENFORCED** |
 | seeded-bug ladder is complete and non-duplicating | **NOT ENFORCED** |
 | ordered sequence passes N-1 arrows, one direction | **NOT ENFORCED** |
-| no Arabic authored by a non-Claude lane | **NOT ENFORCED** — no authorship provenance field exists |
+| no Arabic authored by a non-Claude lane | **NOT ENFORCED** — `localisation_provenance.authored_by` exists in the schema, but no record populates it and no validator checks it |
 | approval routing is correctly typed | partially — `generate_session.py` enforces typed `approval.kind` on blueprints only |
 | gates ran deterministic, then visual, then physical | **NOT ENFORCED** |
 

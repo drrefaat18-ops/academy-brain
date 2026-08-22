@@ -2,11 +2,11 @@ step: D
 builder: claude
 reviewer: codex
 date: 2026-08-22
-iteration: 1
+iteration: 2
 verdict: BLOCKED
 blocking: 16
 advisory: 2
-status_after_fixes: awaiting re-review
+status_after_fixes: iteration-2 fixes applied, awaiting third review
 
 # Codex reviewed under -s read-only and could not run tests. The reviewer's two
 # central file:line claims were independently verified by the builder before any
@@ -131,3 +131,79 @@ reviewer_quality_note: >
   (6, 7, 10-15) demanded implementation well beyond the lane's file scope; those were
   answered by removing the false enforcement claims and opening lane H rather than by
   silently widening scope.
+
+# ---------------------------------------------------------------------------
+# Iteration 2 — codex re-reviewed the fixes and blocked again. 11 blocking.
+# The reviewer was right to: several iteration-1 "fixes" were recorded as done
+# while the file did not actually carry them.
+# ---------------------------------------------------------------------------
+
+iteration_2:
+  verdict: BLOCKED
+  blocking: 11
+  verified_by_builder:
+    - id: D2-04
+      claim: "applicability and confidence are indented under required_by_tier, so they parse as tier names"
+      result: CONFIRMED
+      evidence: >
+        yaml.safe_load reported required_by_tier keys as
+        ['tier_1','tier_2','tier_3','applicability','confidence'] — the two fields
+        finding 4 supposedly added were never required of a source entry at all.
+        Iteration 1 recorded this finding as fixed. It was not.
+    - id: D2-CITE-01
+      claim: "the cited `rubric.md` does not exist at that path"
+      result: CONFIRMED
+      evidence: "the file is 00-contracts/rubric.md; §5 begins at line 59."
+
+  fixes_applied:
+    - finding: D2-04
+      action: >
+        applicability, confidence and license moved into source_entry.required.
+        Verified by re-parsing: required now carries all eight fields and
+        required_by_tier carries exactly the three tiers.
+    - finding: D2-05A
+      action: status added to the agent file's claim contract, with the SOURCED-conditional rule stated.
+    - finding: D2-05B
+      action: >
+        "A claim without locator is not a claim" corrected to apply only to SOURCED
+        claims. The skill contradicted the canonical schema AND the schema's own
+        example, and would have pushed an agent to invent a locator.
+    - finding: D2-06-07A
+      action: >
+        YAML parsing relabelled NOT ENFORCED. It was verified by hand; no gate or CI
+        step reads knowledge/ev3/. Calling a manual check "enforced (parser)" is the
+        exact dishonesty section 9 exists to remove.
+    - finding: D2-06-07B
+      action: >
+        Enforcement table given a governing sentence — everything in the schema is
+        NOT_ENFORCED unless the table says otherwise — plus eight rows naming the
+        previously omitted rule families explicitly.
+    - finding: D2-06-07C
+      action: corrected to say the authored_by field exists but is unpopulated and unvalidated.
+    - finding: D2-12
+      action: >
+        Licence provenance now resolves to source_entry.license via source_id, and a
+        step may not cite a source whose licence is unknown. Previously the rule
+        demanded licence provenance that no record shape could carry.
+    - finding: D2-15
+      action: >
+        Rewritten as an explicit manual obligation (REVIEWER MUST REJECT) rather than
+        an automated outcome, since no validator performs the rejection.
+    - finding: D2-CITE-01
+      action: corrected to 00-contracts/rubric.md:59-66.
+    - finding: D2-CITE-02
+      action: >
+        cite_filter.py removed from the consumer list. It parses critique JSON
+        issues[].cites and never reads this schema; the header implied otherwise.
+    - finding: D2-NEW-01
+      action: >
+        The agent's free-standing review: map replaced with the canonical
+        approval_record and review_receipt structures. Receipt block re-parsed under
+        yaml.safe_load to confirm it is valid YAML, not just plausible text.
+
+  reviewer_quality_note: >
+    Second strong review. D2-04 is the one that matters most: iteration 1 claimed the
+    fix and the receipt recorded it as applied, but the field was indented one level
+    wrong and silently became a tier name. A reviewer who re-parses rather than
+    re-reads is the only thing that catches that, and it is a direct argument for
+    verifying fixes by execution rather than by diff.

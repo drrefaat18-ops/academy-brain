@@ -23,6 +23,9 @@ stages:
   digest_assets: _assets
   provenance: 20-provenance
   receipts: 90-receipts
+asset_discovery:
+  asset_ref_pattern: '`(img-[^`]+[.]png)`'
+  asset_source_files: [slides-source.md]
 """
 
 

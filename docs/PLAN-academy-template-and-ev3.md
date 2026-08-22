@@ -381,13 +381,24 @@ temp-course files are E outputs, not source edits.
 | `scripts/swarm/paths.py` | B | codex |
 | `tests/test_paths.py` | B | codex |
 | `tests/test_course_config.py` | B | codex |
-| `scripts/swarm/check_assets.py` | C0 | opencode |
-| `tests/test_check_assets.py` | C0 | opencode |
+| `scripts/swarm/check_assets.py` | C0 -> **C0-int** | opencode -> **claude** |
+| `tests/test_check_assets.py` | C0 -> **C0-int** | opencode -> **claude** |
 | `scripts/swarm/generate_session.py` | C1 | claude |
 | `scripts/swarm/overlay.py` | C1 | claude |
 | `pyproject.toml` | C1 | claude |
 | `tests/test_overlay.py` | C1 | claude |
 | `tests/test_generate_session.py` | C1 | claude |
+
+**Amendment, 2026-08-22 — C0 reassigned to claude as C0-int (integration).**
+Review iteration 2 found that the decisive defect (C0-08) could not be fixed
+inside lane C0 at all: `asset_discovery` had to move into `scripts/swarm/config.py`,
+which lane B owns. Two parsers for one file had drifted apart, and the CLI accepted
+a section the canonical loader rejected. The matrix rule says a lane that needs
+another lane's file must STOP, so the fix moved to the integration owner rather
+than widening C0's scope. `config.py`, `paths.py` and their tests remain lane B's;
+they were edited here only to add the validated `asset_discovery` field, and the
+change was verified against every existing consumer.
+
 | `00-contracts/brand-and-output.md` | C4 | opencode |
 | `00-contracts/rubric.md` | C4 | opencode |
 | `75-bundle/_TEMPLATE-blueprint.md` | C4 | opencode |

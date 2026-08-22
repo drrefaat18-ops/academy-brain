@@ -2,21 +2,63 @@
 
 The cross-course coverage runs through main(argv) — the real CLI entry point —
 because a generalisation the entry point cannot reach is not a generalisation.
+
+The governing rule here is that discovery FAILS CLOSED. Two review iterations
+were rejected for the same defect wearing different hats: when discovery could
+not be resolved, the gate quietly used the micro:bit naming, found zero
+references, and printed "PASS: 0 present" for a course whose every asset was
+missing. Several tests below exist purely to keep that outcome unreachable —
+they assert a nonzero exit where an earlier version asserted a green pass.
 """
 
 import re
+
+import pytest
 
 from swarm import check_assets
 
 EV3_REF = re.compile(r"`((?:shot|render)[A-Za-z0-9_.\-]*\.(?:png|svg))`")
 
-# A differently-named course manifest: different asset prefixes, different
-# source filenames. Written raw so the regex backslashes survive verbatim.
-EV3_MANIFEST = r"""
-asset_discovery:
-  asset_ref_pattern: '`((?:shot|render)[A-Za-z0-9_.\-]*\.(?:png|svg))`'
-  asset_source_files: [deck.md]
+# Everything a manifest needs besides discovery. load_course validates the whole
+# document, so a fixture manifest has to be a real one.
+MANIFEST_BASE = """levels: [1]
+sessions_per_level: 8
+providers: [claude, codex, opencode, hermes]
+artifact_schedule:
+  s1: true
+  s2: true
+  s3: true
+  s4: true
+  s5: true
+  s6: true
+  s7: true
+  s8: false
+stages:
+  digest: 10-digest
+  digest_assets: _assets
+  provenance: 20-provenance
+  receipts: 90-receipts
 """
+
+MICROBIT_DISCOVERY = (
+    "asset_discovery:\n"
+    r"  asset_ref_pattern: '`((?:img|tata|technosquare)[A-Za-z0-9_.\-]*\.(?:png|gif|jpg|jpeg))`'"
+    "\n  asset_source_files: [slides-source.md, home-summary.md]\n"
+)
+
+# A differently-named course: different asset prefixes, different source
+# filenames. Raw string so the regex backslashes survive verbatim.
+EV3_DISCOVERY = (
+    "asset_discovery:\n"
+    r"  asset_ref_pattern: '`((?:shot|render)[A-Za-z0-9_.\-]*\.(?:png|svg))`'"
+    "\n  asset_source_files: [deck.md]\n"
+)
+
+
+def _manifest(root, discovery=MICROBIT_DISCOVERY):
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "course.yaml").write_text(MANIFEST_BASE + discovery, encoding="utf-8")
+    return root
 
 
 def _microbit_bundle(tmp_path):
@@ -35,17 +77,18 @@ def _microbit_bundle(tmp_path):
     return b
 
 
-def _bare_bundle(tmp_path):
-    """Assets dir + one source file the test fills in itself."""
-    b = tmp_path / "bare"
+def _bare_bundle(tmp_path, name="bare"):
+    """Assets dir + both default source files, contents filled in by the test."""
+    b = tmp_path / name
     (b / "assets").mkdir(parents=True)
     (b / "slides-source.md").touch()
+    (b / "home-summary.md").touch()
     return b
 
 
 def _ev3_course(tmp_path):
     """A differently-named course: its own manifest declares its discovery."""
-    root = tmp_path / "ev3-course"
+    root = _manifest(tmp_path / "ev3-course", EV3_DISCOVERY)
     b = root / "bundles" / "e1-s1"
     (b / "assets").mkdir(parents=True)
     (b / "assets" / "shot-arm.png").write_bytes(b"x")
@@ -57,24 +100,18 @@ def _ev3_course(tmp_path):
     )
     # micro:bit-style reference in a file that is NOT an EV3 source: ignored.
     (b / "slides-source.md").write_text("- **Asset:** `img-01.png`\n", encoding="utf-8")
-    (root / "course.yaml").write_text(EV3_MANIFEST.lstrip(), encoding="utf-8")
     return b
 
 
-def test_microbit_shape_default_params(tmp_path):
-    """One-arg audit on a micro:bit-shaped bundle behaves exactly as today."""
-    b = _microbit_bundle(tmp_path)
-    ok, to_create, dangling = check_assets.audit(b)
-    assert ok == ["img-01.png", "tata-01.gif"]
-    assert to_create == ["img-02.png"]
-    assert dangling == ["technosquare-logo.jpg"]
-    assert check_assets.unused(b) == ["img-99.png"]
+# --------------------------------------------------------------------------
+# the CLI generalises
+# --------------------------------------------------------------------------
 
 
 def test_main_cli_finds_differently_named_course(tmp_path, capsys):
     """main() generalises via the course manifest — this test would have caught C0-03.
 
-    Under micro:bit defaults this bundle yields zero references and a green PASS;
+    Under micro:bit naming this bundle yields zero references and a green PASS;
     the manifest-declared deck.md/shot-* discovery must flip it to a real FAIL.
     """
     b = _ev3_course(tmp_path)
@@ -90,16 +127,167 @@ def test_main_cli_finds_differently_named_course(tmp_path, capsys):
     assert "UNUSED     img-orphan.png" in out
 
 
-def test_main_cli_manifest_without_discovery_keeps_defaults(tmp_path, capsys):
-    """A course.yaml without an asset_discovery section changes nothing."""
+def test_main_cli_on_microbit_course(tmp_path, capsys):
     b = _microbit_bundle(tmp_path)
-    (b.parent / "course.yaml").write_text("levels: [1]\n", encoding="utf-8")
+    _manifest(tmp_path)
     rc = check_assets.main(["check_assets.py", str(b)])
     out = capsys.readouterr().out
     assert rc == 1  # technosquare-logo.jpg is referenced, undeclared, missing
-    assert "  TO-CREATE  img-02.png\n" in out
     assert "  OK         img-01.png\n" in out
-    assert "\nFAIL: 1 dangling asset reference(s)" in out
+    assert "  TO-CREATE  img-02.png\n" in out
+    assert "  DANGLING   technosquare-logo.jpg\n" in out
+    assert "  UNUSED     img-99.png" in out
+
+
+def test_nearest_manifest_wins(tmp_path, capsys):
+    """A bundle is governed by the closest course.yaml above it, not the outermost."""
+    outer = _manifest(tmp_path / "outer", MICROBIT_DISCOVERY)
+    inner = _manifest(outer / "inner", EV3_DISCOVERY)
+    b = inner / "b1"
+    (b / "assets").mkdir(parents=True)
+    (b / "deck.md").write_text("`shot-arm.png`\n", encoding="utf-8")
+
+    assert check_assets.main(["check_assets.py", str(b)]) == 1
+    assert "DANGLING   shot-arm.png" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------
+# fail-closed: every one of these used to be a silent green pass
+# --------------------------------------------------------------------------
+
+
+def test_no_manifest_anywhere_is_an_error_not_a_default(tmp_path, capsys):
+    """C0-03. No manifest must never mean 'assume micro:bit'."""
+    b = tmp_path / "orphan"
+    (b / "assets").mkdir(parents=True)
+    (b / "deck.md").write_text("`shot-missing.png`\n", encoding="utf-8")
+
+    rc = check_assets.main(["check_assets.py", str(b)])
+    assert rc == 2
+    assert "no course.yaml found" in capsys.readouterr().err
+
+
+def test_manifest_without_discovery_is_an_error(tmp_path, capsys):
+    """C0-06. The same bug as C0-03 under a different fallback condition."""
+    root = tmp_path / "no-discovery"
+    root.mkdir()
+    (root / "course.yaml").write_text(MANIFEST_BASE, encoding="utf-8")
+    b = root / "b1"
+    (b / "assets").mkdir(parents=True)
+
+    rc = check_assets.main(["check_assets.py", str(b)])
+    assert rc == 2
+    assert "asset_discovery" in capsys.readouterr().err
+
+
+def test_configured_source_file_missing_is_an_error(tmp_path, capsys):
+    """C0-07. A typo'd source name turned the whole audit into an empty pass."""
+    root = _manifest(
+        tmp_path / "typo",
+        "asset_discovery:\n"
+        r"  asset_ref_pattern: '`(shot-[^`]+\.png)`'"
+        "\n  asset_source_files: [dekk.md]\n",
+    )
+    b = root / "b1"
+    (b / "assets").mkdir(parents=True)
+    (b / "deck.md").write_text("`shot-missing.png`\n", encoding="utf-8")
+
+    rc = check_assets.main(["check_assets.py", str(b)])
+    assert rc == 2
+    assert "configured source file(s) not found: dekk.md" in capsys.readouterr().err
+
+
+def test_multi_group_pattern_is_refused(tmp_path, capsys):
+    """C0-09. findall() returns tuples past one group, and the audit dies mid-run."""
+    root = _manifest(
+        tmp_path / "groups",
+        "asset_discovery:\n"
+        r"  asset_ref_pattern: '`((shot|render)-([^.]+)\.(png|svg))`'"
+        "\n  asset_source_files: [deck.md]\n",
+    )
+    b = root / "b1"
+    (b / "assets").mkdir(parents=True)
+    (b / "deck.md").write_text("`shot-arm.png`\n", encoding="utf-8")
+
+    rc = check_assets.main(["check_assets.py", str(b)])
+    assert rc == 2
+    assert "exactly one capture group" in capsys.readouterr().err
+
+
+def test_source_file_escaping_the_bundle_is_refused(tmp_path, capsys):
+    """C0-10. An escaping source path audits another course and passes this one."""
+    root = _manifest(
+        tmp_path / "escape",
+        "asset_discovery:\n"
+        r"  asset_ref_pattern: '`(shot-[^`]+\.png)`'"
+        "\n  asset_source_files: ['../../other/deck.md']\n",
+    )
+    b = root / "b1"
+    (b / "assets").mkdir(parents=True)
+
+    rc = check_assets.main(["check_assets.py", str(b)])
+    assert rc == 2
+    assert "must be one file name inside the bundle" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "discovery, expected",
+    [
+        ("asset_discovery:\n  asset_ref_patterns: ['oops']\n", "unknown asset_discovery"),
+        (
+            "asset_discovery:\n  asset_ref_pattern: '`([unclosed'\n"
+            "  asset_source_files: [deck.md]\n",
+            "not a valid regex",
+        ),
+        ("asset_discovery: 'a string'\n", "must be a mapping"),
+        (
+            "asset_discovery:\n"
+            r"  asset_ref_pattern: '`(shot-[^`]+\.png)`'"
+            "\n  asset_source_files: []\n",
+            "non-empty list",
+        ),
+        (
+            "asset_discovery:\n  asset_source_files: [deck.md]\n",
+            "missing field(s): asset_discovery.asset_ref_pattern",
+        ),
+    ],
+)
+def test_malformed_discovery_fails_loudly(tmp_path, capsys, discovery, expected):
+    """A malformed section must never degrade into another course's naming."""
+    root = _manifest(tmp_path / "bad", discovery)
+    b = root / "b1"
+    b.mkdir(parents=True)
+
+    rc = check_assets.main(["check_assets.py", str(b)])
+    assert rc == 2
+    assert expected in capsys.readouterr().err
+
+
+def test_unparseable_manifest_fails_loudly(tmp_path, capsys):
+    root = tmp_path / "broken"
+    root.mkdir()
+    (root / "course.yaml").write_text("levels: [1\n  bad: :\n", encoding="utf-8")
+    b = root / "b1"
+    b.mkdir()
+
+    rc = check_assets.main(["check_assets.py", str(b)])
+    assert rc == 2
+    assert "invalid YAML" in capsys.readouterr().err
+
+
+# --------------------------------------------------------------------------
+# the direct API: module globals still steer it, resolved at call time
+# --------------------------------------------------------------------------
+
+
+def test_microbit_shape_default_params(tmp_path):
+    """One-arg audit on a micro:bit-shaped bundle behaves exactly as today."""
+    b = _microbit_bundle(tmp_path)
+    ok, to_create, dangling = check_assets.audit(b)
+    assert ok == ["img-01.png", "tata-01.gif"]
+    assert to_create == ["img-02.png"]
+    assert dangling == ["technosquare-logo.jpg"]
+    assert check_assets.unused(b) == ["img-99.png"]
 
 
 def test_call_time_pattern_override_changes_results(tmp_path, monkeypatch):
@@ -108,8 +296,7 @@ def test_call_time_pattern_override_changes_results(tmp_path, monkeypatch):
     Definition-time binding froze the default into the signature and made this
     override silently dead; it must keep steering the one-argument API.
     """
-    b = tmp_path / "shot-bundle"
-    (b / "assets").mkdir(parents=True)
+    b = _bare_bundle(tmp_path, "shot-bundle")
     (b / "assets" / "shot-arm.png").write_bytes(b"x")
     (b / "slides-source.md").write_text("`shot-arm.png`\n", encoding="utf-8")
 
@@ -121,8 +308,7 @@ def test_call_time_pattern_override_changes_results(tmp_path, monkeypatch):
 
 def test_call_time_source_files_override_changes_results(tmp_path, monkeypatch):
     """SOURCE_FILES overrides resolve at call time too."""
-    b = tmp_path / "deck-bundle"
-    (b / "assets").mkdir(parents=True)
+    b = _bare_bundle(tmp_path, "deck-bundle")
     (b / "assets" / "img-x.png").write_bytes(b"x")
     (b / "deck.md").write_text("`img-x.png`\n", encoding="utf-8")
 
@@ -132,54 +318,49 @@ def test_call_time_source_files_override_changes_results(tmp_path, monkeypatch):
     assert check_assets.audit(b) == (["img-x.png"], [], [])
 
 
-def test_partial_discovery_section_mixes_with_defaults(tmp_path, capsys):
-    """Only asset_source_files declared -> ref pattern falls back to the default."""
-    root = tmp_path / "partial-course"
-    b = root / "b1"
+def test_declared_source_file_missing_raises(tmp_path, monkeypatch):
+    """The direct API fails closed for the same reason the CLI does."""
+    b = tmp_path / "only-home"
     (b / "assets").mkdir(parents=True)
-    (b / "assets" / "img-07.png").write_bytes(b"x")
-    (b / "deck.md").write_text("`img-07.png` and missing `img-08.png`\n", encoding="utf-8")
-    (root / "course.yaml").write_text(
-        "asset_discovery:\n  asset_source_files: [deck.md]\n", encoding="utf-8"
-    )
+    (b / "home-summary.md").write_text("- **Asset:** `tata-01.gif`\n", encoding="utf-8")
 
-    rc = check_assets.main(["check_assets.py", str(b)])
-    out = capsys.readouterr().out
-    assert rc == 1
-    assert "  OK         img-07.png\n" in out
-    assert "  DANGLING   img-08.png\n" in out
+    with pytest.raises(check_assets.DiscoveryError, match="slides-source.md"):
+        check_assets.audit(b)
+
+    monkeypatch.setattr(check_assets, "SOURCE_FILES", ("home-summary.md",))
+    ok, _, dangling = check_assets.audit(b)
+    assert ok == [] and dangling == ["tata-01.gif"]
+
+
+# --------------------------------------------------------------------------
+# reference recognition
+# --------------------------------------------------------------------------
 
 
 def test_empty_bundle_reports_clean_pass(tmp_path, capsys):
-    b = tmp_path / "empty"
-    (b / "assets").mkdir(parents=True)
+    """An genuinely empty bundle passes — but only once discovery RESOLVED.
+
+    The distinction this file exists to preserve: "nothing referenced" is a
+    pass, "could not tell what to look for" is not.
+    """
+    root = _manifest(tmp_path)
+    b = _bare_bundle(root)
     assert check_assets.audit(b) == ([], [], [])
     assert check_assets.unused(b) == []
-    rc = check_assets.main(["check_assets.py", str(b)])
-    out = capsys.readouterr().out
-    assert rc == 0
-    assert "\nPASS: 0 present, 0 to create" in out
+    assert check_assets.main(["check_assets.py", str(b)]) == 0
+    assert "\nPASS: 0 present, 0 to create" in capsys.readouterr().out
 
 
 def test_missing_assets_dir_is_dangling_not_crash(tmp_path):
     b = tmp_path / "no-assets"
     b.mkdir(parents=True)
     (b / "slides-source.md").write_text("`img-lost.png`\n", encoding="utf-8")
+    (b / "home-summary.md").touch()
     ok, to_create, dangling = check_assets.audit(b)
     assert ok == []
     assert to_create == []
     assert dangling == ["img-lost.png"]
     assert check_assets.unused(b) == []
-
-
-def test_missing_source_files_are_skipped_silently(tmp_path):
-    b = tmp_path / "only-home"
-    (b / "assets").mkdir(parents=True)
-    (b / "assets" / "tata-01.gif").write_bytes(b"x")
-    (b / "home-summary.md").write_text("- **Asset:** `tata-01.gif`\n", encoding="utf-8")
-    ok, to_create, dangling = check_assets.audit(b)
-    assert ok == ["tata-01.gif"]
-    assert dangling == []
 
 
 def test_matching_is_case_sensitive(tmp_path):
@@ -189,8 +370,7 @@ def test_matching_is_case_sensitive(tmp_path):
     differs in case; and a fully uppercased name (IMG-UPPER.png) is not even
     recognised, because the known prefixes are lowercase.
     """
-    b = tmp_path / "case"
-    (b / "assets").mkdir(parents=True)
+    b = _bare_bundle(tmp_path, "case")
     (b / "assets" / "img-camera.png").write_bytes(b"x")
     (b / "slides-source.md").write_text("`img-Camera.png`\n`IMG-UPPER.png`\n", encoding="utf-8")
     ok, to_create, dangling = check_assets.audit(b)
@@ -216,94 +396,16 @@ def test_only_backticked_asset_shaped_spans_are_references(tmp_path):
         assert ignored not in dangling
 
 
-def test_source_file_may_escape_bundle_by_design(tmp_path, monkeypatch):
-    """Documented policy: containment is NOT enforced here.
-
-    Source names come from the trusted course manifest and are joined to the
-    bundle path as-is; ../outside.md deliberately reads outside the bundle.
-    Callers auditing untrusted manifests must validate containment themselves.
-    """
-    outside = tmp_path / "outside.md"
-    outside.write_text("`img-shared.png`\n", encoding="utf-8")
-    b = tmp_path / "b"
-    (b / "assets").mkdir(parents=True)
-
-    monkeypatch.setattr(check_assets, "SOURCE_FILES", ("../outside.md",))
-    ok, to_create, dangling = check_assets.audit(b)
-    assert ok == []
-    assert dangling == ["img-shared.png"]
-
-
-def test_manifest_rejects_unknown_discovery_keys(tmp_path, capsys):
-    """A typo'd discovery key must fail loudly, not silently audit the wrong course."""
-    root = tmp_path / "typo-course"
-    b = root / "b1"
-    b.mkdir(parents=True)
-    (root / "course.yaml").write_text(
-        "asset_discovery:\n  asset_ref_patterns: ['oops']\n", encoding="utf-8"
-    )
-    rc = check_assets.main(["check_assets.py", str(b)])
-    err = capsys.readouterr().err
-    assert rc == 2
-    assert "unknown asset_discovery key(s): asset_ref_patterns" in err
-
-
-def test_manifest_rejects_uncompilable_ref_pattern(tmp_path, capsys):
-    root = tmp_path / "bad-regex-course"
-    b = root / "b1"
-    b.mkdir(parents=True)
-    (root / "course.yaml").write_text(
-        "asset_discovery:\n  asset_ref_pattern: '`([unclosed'\n", encoding="utf-8"
-    )
-    rc = check_assets.main(["check_assets.py", str(b)])
-    err = capsys.readouterr().err
-    assert rc == 2
-    assert "invalid asset_ref_pattern" in err
-
-
-def test_manifest_rejects_non_mapping_discovery_section(tmp_path, capsys):
-    root = tmp_path / "flat-course"
-    b = root / "b1"
-    b.mkdir(parents=True)
-    (root / "course.yaml").write_text("asset_discovery: [not, a, mapping]\n", encoding="utf-8")
-    rc = check_assets.main(["check_assets.py", str(b)])
-    err = capsys.readouterr().err
-    assert rc == 2
-    assert "asset_discovery must be a mapping" in err
-
-
-def test_manifest_rejects_unparseable_yaml(tmp_path, capsys):
-    root = tmp_path / "broken-course"
-    b = root / "b1"
-    b.mkdir(parents=True)
-    (root / "course.yaml").write_text("asset_discovery: {unclosed\n", encoding="utf-8")
-    rc = check_assets.main(["check_assets.py", str(b)])
-    err = capsys.readouterr().err
-    assert rc == 2
-    assert "unreadable course manifest" in err
-
-
 def test_dangling_reference(tmp_path):
     b = _bare_bundle(tmp_path)
-    (b / "slides-source.md").write_text("`img-nope.png`\n", encoding="utf-8")
-    ok, to_create, dangling = check_assets.audit(b)
-    assert ok == []
-    assert to_create == []
-    assert dangling == ["img-nope.png"]
+    (b / "slides-source.md").write_text("`img-ghost.png`\n", encoding="utf-8")
+    assert check_assets.audit(b)[2] == ["img-ghost.png"]
 
 
 def test_to_create_reference_declared_in_sources_md(tmp_path):
     b = _bare_bundle(tmp_path)
     (b / "slides-source.md").write_text("`img-later.png`\n", encoding="utf-8")
-    (b / "SOURCES.md").write_text("| `img-later.png` | planned |", encoding="utf-8")
+    (b / "SOURCES.md").write_text("| `img-later.png` | to be created |", encoding="utf-8")
     ok, to_create, dangling = check_assets.audit(b)
-    assert ok == []
     assert to_create == ["img-later.png"]
     assert dangling == []
-
-
-def test_unused_asset_on_disk(tmp_path):
-    b = _microbit_bundle(tmp_path)
-    (b / "assets" / "orphan.png").write_bytes(b"x")
-    (b / "assets" / "stray.txt").write_bytes(b"x")
-    assert check_assets.unused(b) == ["img-99.png", "orphan.png", "stray.txt"]

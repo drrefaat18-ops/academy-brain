@@ -180,3 +180,50 @@ def test_unknown_format_is_refused_not_guessed(tmp_path):
 def test_missing_deck_is_an_error_for_find_too(tmp_path):
     with pytest.raises(overlay.OverlayError, match="no deck at"):
         overlay.find_regions(tmp_path / "nope.pdf")
+
+
+# --------------------------------------------------------------------------
+# the wiring: generate_session._composite is what makes the module load-bearing.
+# Without these, overlay.py is a tested module nothing calls.
+# --------------------------------------------------------------------------
+
+from swarm import generate_session as gs
+
+
+def _pass(*assets):
+    return gs.Pass(
+        key="deck-a",
+        notebook="nb",
+        instructions="",
+        evidence=[
+            gs.Asset(aid=aid, slide="1", path=path, klass="EVIDENCE",
+                     status="produced and mapped")
+            for aid, path in assets
+        ],
+    )
+
+
+def test_composite_fills_the_downloaded_deck(tmp_path):
+    deck = _pdf(tmp_path, "[Reserved Image Area: bug-1]")
+    gs._composite(deck, _pass(("bug-1", _png(tmp_path))))
+    assert overlay.find_regions(deck) == []
+
+
+def test_composite_refuses_a_deck_it_cannot_fill(tmp_path):
+    """The L1-s1 defect: an empty box reaching the owner."""
+    deck = _pdf(tmp_path, "[Reserved Image Area: bug-1]")
+    with pytest.raises(overlay.OverlayError, match="no resolvable asset"):
+        gs._composite(deck, _pass())
+
+
+def test_composite_passes_a_deck_with_no_regions(tmp_path):
+    gs._composite(_pdf(tmp_path, "an ordinary slide"), _pass())
+
+
+def test_composite_is_idempotent(tmp_path):
+    """The skip path re-runs it on an already-overlaid deck."""
+    deck = _pdf(tmp_path, "[Reserved Image Area: bug-1]")
+    p = _pass(("bug-1", _png(tmp_path)))
+    gs._composite(deck, p)
+    gs._composite(deck, p)
+    assert overlay.find_regions(deck) == []

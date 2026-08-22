@@ -1,9 +1,10 @@
 # knowledge/ev3/intake-schema.yaml
 #
 # The shape every EV3 fact must take before it is allowed into the pipeline.
-# Owned by lane D. Consumed by .claude/agents/ev3-specialist.md and by
-# scripts/swarm/gates/cite_filter.py -- see the enforcement_status block below;
-# that gate does NOT currently understand claim cards.
+# Owned by lane D. Consumed by .claude/agents/ev3-specialist.md and by human
+# reviewers. NOTHING in scripts/ reads this file: scripts/swarm/gates/cite_filter.py
+# is a nearby but unrelated gate that parses critique JSON issues[].cites and has
+# no knowledge of claim cards. See the enforcement_status block below.
 #
 # This file is a SCHEMA, not data. It contains no EV3 facts, because no EV3
 # course content has been delivered yet (confirmed 2026-08-22). Every example
@@ -53,21 +54,23 @@ source_entry:
     title:          "human-readable"
     origin:         "URL, or a repo-relative file path for local material"
     retrieved_on:   "ISO date the material was actually obtained"
+    # Indented under required_by_tier these parsed as two extra TIER NAMES, so
+    # a source entry could omit both and still satisfy the documented shape.
+    applicability:
+      hardware: "which EV3 kit(s)/part numbers this source covers. 'unknown' is a value that forces UNVERIFIED downstream."
+      software: "which programming environment and version(s) it covers, same rule"
+      firmware: "which brick firmware version(s) it covers, same rule"
+    confidence: "one of confidence_values — how much this source can carry on its own"
+    license: "licence or terms of use for this material; 'unknown' is a blocker, not a value"
   required_by_tier:
     tier_1:
       version_or_date: "document version, edition, or publication date"
-      license:         "licence or terms of use; 'unknown' is a blocker, not a value"
     tier_2:
       observed_by:  "who physically looked"
       observed_on:  "ISO date"
       media:        "path(s) to the photographs backing the observation"
     tier_3:
       provenance_review: "who reviewed it, on what date, and what they concluded"
-    applicability:
-      hardware: "which EV3 kit(s)/part numbers this source covers. 'unknown' is a value that forces UNVERIFIED downstream."
-      software: "which programming environment and version(s) it covers, same rule"
-      firmware: "which brick firmware version(s) it covers, same rule"
-    confidence: "one of confidence_values — how much this source can carry on its own"
   optional:
     notes: "free text; never a substitute for a locator"
 
@@ -135,7 +138,10 @@ procedural_sequence:
     - "transitions between steps number exactly N-1"
     - "every transition follows the single declared direction"
     - "every step asset resolves on disk and its sha256 matches"
-    - "every step carries source/licence provenance"
+    - "every step resolves to a source_entry via source_id; that entry's required
+       license field IS the licence provenance for the step. There is no separate
+       licence field on the step or on the asset record, and no step may cite a
+       source whose license is 'unknown'."
   note: >
     N steps imply N-1 arrows, one direction. This is the documented OCR blind
     spot. It is not detectable by reading the text of any single step.
@@ -333,8 +339,11 @@ localisation_provenance:
     language:      "e.g. ar"
     authored_by:   "the lane/provider that wrote it"
   validation:
-    - "Arabic text attributed to any non-Claude lane is rejected"
-  status: NOT_ENFORCED   # no field is populated today; lane H
+    # Phrased as a manual review obligation, not an automated outcome: no
+    # validator performs this rejection today, so calling it "rejected" would
+    # report enforcement the pipeline does not have.
+    - "REVIEWER MUST REJECT (manually): Arabic text attributed to any non-Claude lane"
+  status: NOT_ENFORCED   # no field is populated and no validator runs; lane H
 
 # ---------------------------------------------------------------------------
 # 8. Routing rule — repeated here because it is the one that gets broken
