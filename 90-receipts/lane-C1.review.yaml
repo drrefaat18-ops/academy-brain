@@ -1,0 +1,82 @@
+step: C1
+builder: claude
+reviewer: codex
+date: 2026-08-22
+iteration: 1
+verdict: BLOCKED
+blocking: 14
+status_after_fixes: 6 fixed, 8 open — see remaining
+
+# First review of this lane. It found, in the builder's own fail-closed gate,
+# the exact defect class the builder had spent three rounds blocking in others.
+
+verified_by_builder:
+  - id: C1-01
+    result: CONFIRMED — reproduced
+    evidence: >
+      Built a PDF, applied the redaction, skipped the insert (what an interrupted
+      run leaves behind), then called assert_filled. It PASSED with zero images
+      embedded. find_regions returned [] because the marker really was gone.
+      Marker absence was being treated as proof of image presence.
+  - id: C1-03
+    result: CONFIRMED
+    evidence: >
+      The check was `"approved" not in state.lower()`. Both "unapproved" and
+      "not-approved" CONTAIN "approved", so both satisfied the approval gate.
+
+fixes_applied:
+  - findings: [C1-01, C1-14]
+    action: >
+      assert_filled takes the expected asset map and verifies embedded images are
+      PRESENT, not merely that markers are absent. _composite passes it on both the
+      fresh-download and skip paths. A redaction-only deck now fails with an
+      explicit instruction to delete and regenerate.
+  - finding: C1-03
+    action: status must equal "approved" exactly, parsed from front matter.
+  - finding: C1-04
+    action: >
+      approval.kind is read from the approval mapping inside bounded YAML front
+      matter. The previous loose ^\s*kind: search matched the first kind: anywhere
+      in the document, so unrelated metadata satisfied a gate whose entire purpose
+      is establishing WHO approved it.
+  - finding: C1-05
+    action: >
+      Legacy gap marker matched case-insensitively across any dash form, spacing
+      and indentation. "Gap - owner must decide" and the en-dash variant used to
+      ship as settled content.
+  - finding: C1-06
+    action: >
+      _evidence_map canonicalises ids and refuses duplicates naming both rows.
+      The dict comprehension it replaced let the last duplicate silently win.
+
+remaining:
+  - ids: [C1-02]
+    what: >
+      Region discovery depends on the rendered text layer matching one exact
+      marker grammar. A renderer that wraps, reorders or substitutes glyphs makes
+      a region invisible. Partly mitigated: the image-count check now catches the
+      common consequence, but not a deck where SOME regions are invisible and
+      others filled.
+    why_deferred: >
+      The real fix is a region manifest emitted at generation time and checked
+      against the export. That is a design change to the generation contract, not
+      a patch, and no live run exists yet to validate it against.
+  - ids: [C1-07, C1-08]
+    what: reconciliation is one-directional and recognises only one heading/asset syntax.
+  - ids: [C1-09]
+    what: a marker wrapped across a line yields multiple rects and is refused as a collision. Fails closed, but wrongly.
+  - ids: [C1-10]
+    what: write_receipt hardcodes 90-receipts instead of using lane B's CoursePaths.
+  - ids: [C1-11, C1-12, C1-13]
+    what: >
+      test coverage gaps — rotated pages, wrapped markers, and the typed-approval
+      contracts that live only in _demo(). Partly closed: 11 new collected tests
+      now cover the criticals, duplicate ids, exact status, bounded kind lookup
+      and every legacy-gap spelling.
+
+reviewer_quality_note: >
+  The most valuable review of the three lanes. C1-01 is the builder's own
+  standard turned on the builder: three rounds were spent blocking opencode for
+  gates that reported success without checking, and this gate did the same thing
+  in a different costume. It was found by reasoning about interrupted runs, not
+  by running the suite — the reviewer could not run pytest at all.

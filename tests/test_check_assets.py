@@ -57,7 +57,14 @@ EV3_DISCOVERY = (
 
 
 def _manifest(root, discovery=MICROBIT_DISCOVERY):
+    """Write a complete manifest. Adds expect_references unless the case sets it.
+
+    Centralised so a new required discovery field is added in one place rather
+    than in every inline fixture string.
+    """
     root.mkdir(parents=True, exist_ok=True)
+    if "expect_references" not in discovery and "asset_source_files" in discovery:
+        discovery = discovery.rstrip("\n") + "\n  expect_references: true\n"
     (root / "course.yaml").write_text(MANIFEST_BASE + discovery, encoding="utf-8")
     return root
 
@@ -338,18 +345,23 @@ def test_declared_source_file_missing_raises(tmp_path, monkeypatch):
 # --------------------------------------------------------------------------
 
 
-def test_empty_bundle_reports_clean_pass(tmp_path, capsys):
-    """An genuinely empty bundle passes — but only once discovery RESOLVED.
+def test_empty_bundle_under_a_course_expecting_references_fails(tmp_path, capsys):
+    """The distinction this file exists to preserve.
 
-    The distinction this file exists to preserve: "nothing referenced" is a
-    pass, "could not tell what to look for" is not.
+    "Nothing referenced" is a pass only where the course declares assets
+    optional. Under expect_references: true it is the reported symptom of a
+    pattern that matches nothing — which is exactly how a course with every
+    asset missing used to report success.
+
+    The direct API is unaffected: it has no manifest and no policy, so it still
+    reports an honest empty result.
     """
-    root = _manifest(tmp_path)
+    root = _manifest(tmp_path)  # micro:bit discovery, expect_references: true
     b = _bare_bundle(root)
     assert check_assets.audit(b) == ([], [], [])
     assert check_assets.unused(b) == []
-    assert check_assets.main(["check_assets.py", str(b)]) == 0
-    assert "\nPASS: 0 present, 0 to create" in capsys.readouterr().out
+    assert check_assets.main(["check_assets.py", str(b)]) == 1
+    assert "declares expect_references: true" in capsys.readouterr().out
 
 
 def test_missing_assets_dir_is_dangling_not_crash(tmp_path):
@@ -417,35 +429,62 @@ def test_to_create_reference_declared_in_sources_md(tmp_path):
 # --------------------------------------------------------------------------
 
 
-def test_pattern_that_matches_nothing_fails_closed(tmp_path, capsys):
-    """C0-12. A regex can compile, carry one group, and still match nothing.
+def test_declared_expectation_is_enforced_not_inferred(tmp_path, capsys):
+    """C0-12/C0-16. A regex can compile, carry one group, and match nothing.
 
-    Schema validation cannot tell that from a working pattern; the observable
-    signature is 'no references at all, yet assets/ is full'.
+    The first attempt at this INFERRED the mistake from "no references but
+    assets/ is full". That is not an invariant — assets/ legitimately holds
+    helper scripts and intermediate frames (L1-s1's own does) and assets may be
+    staged before the deck cites them. A gate that cries wolf gets switched off.
+    So the course declares the expectation and only that is enforced.
     """
     root = _manifest(
         tmp_path / "nomatch",
-        "asset_discovery:\n  asset_ref_pattern: '((?!))'\n  asset_source_files: [deck.md]\n",
+        "asset_discovery:\n  asset_ref_pattern: '((?!))'\n"
+        "  asset_source_files: [deck.md]\n  expect_references: true\n",
     )
     b = root / "b1"
     (b / "assets").mkdir(parents=True)
-    (b / "assets" / "shot-arm.png").write_bytes(b"x")
     (b / "deck.md").write_text("`shot-missing.png`\n", encoding="utf-8")
 
-    rc = check_assets.main(["check_assets.py", str(b)])
-    assert rc == 1
-    assert "matched no references at all" in capsys.readouterr().out
+    assert check_assets.main(["check_assets.py", str(b)]) == 1
+    assert "declares expect_references: true" in capsys.readouterr().out
 
 
-def test_empty_bundle_with_empty_assets_still_passes(tmp_path):
-    """The counterpart: nothing referenced AND nothing on disk is a real pass.
+def test_zero_references_pass_when_the_course_says_so(tmp_path, capsys):
+    """The other half of the policy: an asset-free course must not be failed.
 
-    Guards the C0-12 fix against over-reach — it must catch misconfiguration,
-    not every early-stage bundle.
+    Guards C0-16 — the heuristic version failed this legitimate configuration.
     """
-    root = _manifest(tmp_path)
-    b = _bare_bundle(root)
+    root = _manifest(
+        tmp_path / "assetless",
+        "asset_discovery:\n  asset_ref_pattern: '`(shot-[^`]+[.]png)`'\n"
+        "  asset_source_files: [deck.md]\n  expect_references: false\n",
+    )
+    b = root / "b1"
+    (b / "assets").mkdir(parents=True)
+    (b / "assets" / "staged-early.png").write_bytes(b"x")  # staged, not yet cited
+    (b / "deck.md").write_text("no references yet\n", encoding="utf-8")
+
     assert check_assets.main(["check_assets.py", str(b)]) == 0
+    assert "PASS: 0 present" in capsys.readouterr().out
+
+
+def test_expect_references_must_be_declared(tmp_path, capsys):
+    """It is required, not defaulted: the course states its own policy."""
+    root = tmp_path / "undeclared"
+    root.mkdir()
+    (root / "course.yaml").write_text(
+        MANIFEST_BASE + "asset_discovery:\n"
+        "  asset_ref_pattern: '`(shot-[^`]+[.]png)`'\n"
+        "  asset_source_files: [deck.md]\n",
+        encoding="utf-8",
+    )
+    b = root / "b1"
+    b.mkdir()
+
+    assert check_assets.main(["check_assets.py", str(b)]) == 2
+    assert "expect_references" in capsys.readouterr().err
 
 
 def test_symlinked_source_escaping_the_bundle_is_refused(tmp_path):
@@ -473,3 +512,60 @@ def test_discovery_error_is_declared_once():
     """C0-14. A botched patch left two identical class statements."""
     source = Path(check_assets.__file__).read_text(encoding="utf-8")
     assert source.count("class DiscoveryError") == 1
+
+
+def test_unreadable_source_file_is_a_clean_error_not_a_traceback(tmp_path, capsys):
+    """A non-UTF8 source file used to raise UnicodeDecodeError out of the CLI.
+
+    The crash also hid the real problem: that file was never examined, so the
+    audit was incomplete rather than merely noisy.
+    """
+    root = _manifest(
+        tmp_path / "binary",
+        "asset_discovery:\n"
+        r"  asset_ref_pattern: '`(shot-[^`]+[.]png)`'"
+        "\n  asset_source_files: [deck.md]\n",
+    )
+    b = root / "b1"
+    (b / "assets").mkdir(parents=True)
+    (b / "deck.md").write_bytes(b"\xff\xfe`shot-a.png`")
+
+    rc = check_assets.main(["check_assets.py", str(b)])
+    assert rc == 2
+    assert "not readable as UTF-8" in capsys.readouterr().err
+
+
+# --------------------------------------------------------------------------
+# C0-15: assets/ shrinking silently. Every case here REDUCES the set of assets
+# believed to exist, which means fewer dangling refs — a cleaner-looking gate.
+# --------------------------------------------------------------------------
+
+
+def test_assets_that_is_a_file_is_refused(tmp_path):
+    b = _bare_bundle(_manifest(tmp_path))
+    (b / "assets").rmdir()
+    (b / "assets").write_bytes(b"not a directory")
+    with pytest.raises(check_assets.DiscoveryError, match="not a directory"):
+        check_assets.audit(b)
+
+
+def test_directory_wearing_an_image_name_is_refused(tmp_path):
+    b = _bare_bundle(_manifest(tmp_path))
+    (b / "assets" / "img-01.png").mkdir()
+    (b / "slides-source.md").write_text("`img-01.png`\n", encoding="utf-8")
+    with pytest.raises(check_assets.DiscoveryError, match="is a directory"):
+        check_assets.audit(b)
+
+
+def test_missing_assets_dir_is_allowed(tmp_path):
+    """Not every refusal: an early bundle may declare everything to-be-created.
+
+    Those references still surface as TO-CREATE or DANGLING, so allowing this
+    hides nothing.
+    """
+    root = _manifest(tmp_path)
+    b = root / "early"
+    b.mkdir(parents=True)
+    (b / "slides-source.md").write_text("`img-later.png`\n", encoding="utf-8")
+    (b / "home-summary.md").touch()
+    assert check_assets.audit(b)[2] == ["img-later.png"]

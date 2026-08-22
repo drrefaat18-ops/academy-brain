@@ -256,17 +256,53 @@ def overlay(deck: Path, assets: dict[str, Path], out: Path | None = None) -> lis
     return _handlers(deck)[1](deck, assets, out)
 
 
-def assert_filled(deck: Path) -> None:
-    """Fail closed if any reserved region survived to the delivered artifact."""
-    left = find_regions(Path(deck))
+def images_on_page(deck: Path) -> dict[int, int]:
+    """Count of embedded images per 1-based page. PDF only."""
+    counts: dict[int, int] = {}
+    with fitz.open(str(deck)) as doc:
+        for i, page in enumerate(doc, start=1):
+            counts[i] = len(page.get_images())
+    return counts
+
+
+def assert_filled(deck: Path, expected: dict[str, Path] | None = None) -> None:
+    """Fail closed if the deck is not actually finished.
+
+    Marker ABSENCE is not proof of image PRESENCE, and treating it as such was
+    this module's own version of the bug it exists to catch. An interrupted run
+    leaves the redaction applied and the image never inserted: no marker, no
+    picture, and the old check called that a pass. Verified by construction —
+    a redaction-only PDF passed the previous implementation with zero images
+    embedded.
+
+    Pass ``expected`` (the asset-id -> path mapping the deck was built from) to
+    get the real check. Without it only the weaker marker scan runs, which is
+    all a PPTX deck supports.
+    """
+    deck = Path(deck)
+    left = find_regions(deck)
     if left:
-        unit = "page" if Path(deck).suffix.lower() == ".pdf" else "slide"
+        unit = "page" if deck.suffix.lower() == ".pdf" else "slide"
         where = "; ".join(f"{unit} {r.slide_index}: {r.aid}" for r in left)
         raise OverlayError(
             f"{len(left)} reserved region(s) still unfilled in {deck}: {where}. "
             "This deck is an unfinished build, not a deliverable. It must not reach "
             "the owner — an empty dashed box reads to him as a demand for content he "
             "cannot supply, when the asset is usually already on disk."
+        )
+
+    if not expected or deck.suffix.lower() != ".pdf":
+        return
+
+    total = sum(images_on_page(deck).values())
+    if total < len(expected):
+        raise OverlayError(
+            f"{deck} has no marker left, but carries {total} embedded image(s) for "
+            f"{len(expected)} expected asset(s): {', '.join(sorted(expected))}. "
+            "A deck with the placeholder removed and the picture missing is the "
+            "worst outcome available — it looks finished and is not. Most likely "
+            "an interrupted run applied the redaction and never inserted the image; "
+            "delete the deck and regenerate."
         )
 
 

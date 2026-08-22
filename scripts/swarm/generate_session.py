@@ -163,8 +163,36 @@ APPROVAL_KINDS: frozenset[str] = frozenset(
     {"specialist_council", "owner_business", "physical_action_required"}
 )
 
-_GAP_RE = re.compile(r"^GAP - (\S+)", re.M)
+_GAP_RE = re.compile(r"^\s*GAP\s*[-‐-―]\s*(\S+)", re.M | re.I)
 _LEGACY_GAP = "GAP - owner must decide"
+# The legacy marker in every spelling that still means the same thing: any case,
+# any dash, any spacing, indented or not. Matching one exact ASCII form let
+# "Gap - owner must decide" and an en-dash variant ship as settled content.
+_LEGACY_GAP_RE = re.compile(
+    r"^\s*GAP\s*[-‐-―]\s*owner\s+must\s+decide", re.M | re.I
+)
+
+
+def _front_matter(path: Path, text: str) -> dict:
+    """The YAML block delimited by the leading `---` fences, parsed as a mapping.
+
+    Bounded deliberately. The previous version regex-scanned the whole document,
+    so a `kind:` in unrelated prose could satisfy the approval gate.
+    """
+    import yaml
+
+    if not text.startswith("---"):
+        raise HardStop(f"{path} has no YAML front matter — cannot establish approval")
+    end = text.find("\n---", 3)
+    if end == -1:
+        raise HardStop(f"{path} front matter is not closed by a '---' line")
+    try:
+        data = yaml.safe_load(text[3:end])
+    except yaml.YAMLError as exc:
+        raise HardStop(f"{path} front matter is not valid YAML: {exc}") from exc
+    if not isinstance(data, dict):
+        raise HardStop(f"{path} front matter is not a mapping")
+    return data
 
 
 def enforce_blueprint_gate(path: Path) -> None:
@@ -189,13 +217,26 @@ def enforce_blueprint_gate(path: Path) -> None:
         raise HardStop(f"no blueprint at {path} — nothing has been approved yet")
     text = path.read_text(encoding="utf-8")
 
-    status = re.search(r"^status:\s*(.+)$", text, re.M)
-    state = status.group(1).strip().strip("\"'") if status else "(no status field)"
-    if "approved" not in state.lower() or "awaiting" in state.lower():
+    front = _front_matter(path, text)
+
+    # Exact match, not substring: "unapproved" and "not-approved" both CONTAIN
+    # "approved", and both used to satisfy this gate.
+    state = front.get("status")
+    if not isinstance(state, str) or state.strip().strip("\"'").lower() != "approved":
         raise HardStop(f"blueprint status is {state!r} — it has not been approved")
 
-    kind_m = re.search(r"^\s*kind:\s*(\S+)", text, re.M)
-    kind = kind_m.group(1).strip().strip("\"'") if kind_m else None
+    # Bounded to the approval mapping. A loose ^\s*kind: search matched the first
+    # `kind:` anywhere in the document, so unrelated metadata could satisfy a
+    # typed-approval gate that exists precisely to establish who approved it.
+    approval = front.get("approval")
+    if not isinstance(approval, dict):
+        raise HardStop(
+            "blueprint has no approval mapping — state who was competent to "
+            f"approve it, one of {sorted(APPROVAL_KINDS)}"
+        )
+    kind = approval.get("kind")
+    if isinstance(kind, str):
+        kind = kind.strip().strip("\"'")
     if kind is None:
         raise HardStop(
             "blueprint has no approval.kind — state who was competent to approve it, "
@@ -206,7 +247,7 @@ def enforce_blueprint_gate(path: Path) -> None:
             f"blueprint approval.kind is {kind!r} — expected one of {sorted(APPROVAL_KINDS)}"
         )
 
-    if _LEGACY_GAP in text:
+    if _LEGACY_GAP_RE.search(text):
         raise HardStop(
             f"blueprint uses the untyped marker {_LEGACY_GAP!r}. Route it: "
             "'GAP - specialist_council' for anything an agent can settle, "
@@ -427,6 +468,30 @@ def preflight(plan: list[Pass]) -> list[str]:
 # --------------------------------------------------------------------------
 
 
+def _evidence_map(ps: Pass) -> dict[str, Path]:
+    """asset id -> path, with ids canonicalised and collisions refused.
+
+    Building this with a dict comprehension let the last duplicate id win
+    silently, so two rows claiming the same id bound the wrong file with no
+    warning. Ids are stripped and compared case-insensitively because
+    `bug-1` and `Bug-1 ` are the same id to a human writing ASSET-MAPPING.md.
+    """
+    out: dict[str, Path] = {}
+    seen: dict[str, str] = {}
+    for a in ps.evidence:
+        aid = a.aid.strip()
+        key = aid.casefold()
+        if key in seen:
+            raise HardStop(
+                f"{ps.key}: two evidence assets share the id {aid!r} "
+                f"(also seen as {seen[key]!r}). One id, one image — resolve it in "
+                "ASSET-MAPPING.md rather than letting one silently win."
+            )
+        seen[key] = aid
+        out[aid] = a.path
+    return out
+
+
 def _composite(deck: Path, ps: Pass) -> None:
     """Overlay EVIDENCE onto the exported deck, then prove no region survived.
 
@@ -438,10 +503,14 @@ def _composite(deck: Path, ps: Pass) -> None:
     downloaded by an earlier run predates this step and would otherwise be
     delivered unfilled.
     """
+    assets = _evidence_map(ps)
     if _overlay.find_regions(deck):
-        filled = _overlay.overlay(deck, {a.aid: a.path for a in ps.evidence})
+        filled = _overlay.overlay(deck, assets)
         print(f"  overlaid {len(filled)} region(s): {', '.join(filled)}")
-    _overlay.assert_filled(deck)
+    # `assets` is passed so the check verifies images are PRESENT, not merely
+    # that markers are absent. A run interrupted between redaction and insertion
+    # leaves a deck with neither, which the marker-only check called a pass.
+    _overlay.assert_filled(deck, assets)
 
 
 async def _run_pass(client, ps: Pass, out_dir: Path, notebooks: dict[str, str]) -> dict:

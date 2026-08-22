@@ -227,3 +227,93 @@ def test_composite_is_idempotent(tmp_path):
     gs._composite(deck, p)
     gs._composite(deck, p)
     assert overlay.find_regions(deck) == []
+
+
+# --------------------------------------------------------------------------
+# C1 review: the gate proved marker ABSENCE, not image PRESENCE — this module's
+# own version of the bug it exists to catch.
+# --------------------------------------------------------------------------
+
+
+def _redaction_only(tmp_path):
+    """A deck as an interrupted run leaves it: marker redacted, image never placed."""
+    deck = _pdf(tmp_path, "[Reserved Image Area: bug-1]")
+    doc = fitz.open(str(deck))
+    page = doc[0]
+    page.add_redact_annot(page.search_for("[Reserved Image Area: bug-1]")[0])
+    page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+    doc.saveIncr()
+    doc.close()
+    return deck
+
+
+def test_redaction_without_image_is_caught(tmp_path):
+    """C1-01. No marker AND no picture is the worst outcome: it looks finished."""
+    deck = _redaction_only(tmp_path)
+    assert overlay.find_regions(deck) == []          # marker really is gone
+    assert sum(overlay.images_on_page(deck).values()) == 0
+
+    with pytest.raises(overlay.OverlayError, match="no marker left"):
+        overlay.assert_filled(deck, {"bug-1": _png(tmp_path)})
+
+
+def test_a_properly_overlaid_deck_passes_the_stronger_check(tmp_path):
+    deck = _pdf(tmp_path, "[Reserved Image Area: bug-1]")
+    out = tmp_path / "out.pdf"
+    overlay.overlay(deck, {"bug-1": _png(tmp_path)}, out=out)
+    overlay.assert_filled(out, {"bug-1": _png(tmp_path)})
+
+
+def test_composite_rejects_duplicate_asset_ids(tmp_path):
+    """C1-06. A dict comprehension let the last duplicate win silently."""
+    png = _png(tmp_path)
+    p = gs.Pass(
+        key="deck-a", notebook="nb", instructions="",
+        evidence=[
+            gs.Asset(aid="bug-1", slide="1", path=png, klass="EVIDENCE",
+                     status="produced and mapped"),
+            gs.Asset(aid=" Bug-1 ", slide="2", path=tmp_path / "other.png",
+                     klass="EVIDENCE", status="produced and mapped"),
+        ],
+    )
+    with pytest.raises(gs.HardStop, match="share the id"):
+        gs._composite(_pdf(tmp_path, "ordinary"), p)
+
+
+@pytest.mark.parametrize("status", ["unapproved", "not-approved", "NOT APPROVED"])
+def test_approval_status_is_exact_not_substring(tmp_path, status):
+    """C1-03. Every one of these CONTAINS 'approved' and used to pass the gate."""
+    bp = tmp_path / "blueprint.md"
+    bp.write_text(
+        f"---\nstatus: {status}\napproval:\n  kind: specialist_council\n---\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(gs.HardStop, match="has not been approved"):
+        gs.enforce_blueprint_gate(bp)
+
+
+def test_approval_kind_must_live_in_the_approval_mapping(tmp_path):
+    """C1-04. A loose `kind:` search matched unrelated metadata anywhere."""
+    bp = tmp_path / "blueprint.md"
+    bp.write_text(
+        "---\nstatus: approved\nsomething_else:\n  kind: specialist_council\n---\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(gs.HardStop, match="no approval mapping"):
+        gs.enforce_blueprint_gate(bp)
+
+
+@pytest.mark.parametrize(
+    "marker",
+    ["GAP - owner must decide", "Gap - owner must decide",
+     "GAP – owner must decide", "  gap  -  owner   must  decide"],
+)
+def test_legacy_gap_is_caught_in_every_spelling(tmp_path, marker):
+    """C1-05. One exact ASCII form let the other spellings ship as settled."""
+    bp = tmp_path / "blueprint.md"
+    bp.write_text(
+        f"---\nstatus: approved\napproval:\n  kind: specialist_council\n---\n{marker}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(gs.HardStop, match="untyped marker"):
+        gs.enforce_blueprint_gate(bp)

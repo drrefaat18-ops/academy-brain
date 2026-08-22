@@ -399,6 +399,14 @@ than widening C0's scope. `config.py`, `paths.py` and their tests remain lane B'
 they were edited here only to add the validated `asset_discovery` field, and the
 change was verified against every existing consumer.
 
+
+**Amendment, 2026-08-22 — `expect_references` added to the course manifest.**
+Review found that inferring misconfiguration from "no references but assets
+exist" produces false failures: `assets/` legitimately holds helper scripts and
+intermediate frames, and assets may be staged before a deck cites them. The
+course now declares `asset_discovery.expect_references` and the gate enforces
+only the declared policy. Lane E must set it when creating the EV3 manifest.
+
 | `00-contracts/brand-and-output.md` | C4 | opencode |
 | `00-contracts/rubric.md` | C4 | opencode |
 | `75-bundle/_TEMPLATE-blueprint.md` | C4 | opencode |

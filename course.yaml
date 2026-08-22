@@ -25,3 +25,8 @@ asset_discovery:
   asset_source_files:
     - slides-source.md
     - home-summary.md
+  # Every session deck in this course cites assets, so a bundle that references
+  # none has a broken pattern or the wrong source files. Stated rather than
+  # inferred: assets/ legitimately also holds helper scripts and intermediate
+  # frames, so "assets exist" proves nothing on its own.
+  expect_references: true

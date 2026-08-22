@@ -167,3 +167,56 @@ iteration_3:
 verification_iteration_3:
   suite: "164 passed, 1 skipped (symlink test skips without the Windows privilege)"
   scenarios: "C0-12 never-matching pattern -> exit 1; empty bundle -> exit 0; real bundle unchanged at 21 present, 1 to create"
+
+# ---------------------------------------------------------------------------
+# Iteration 4 — codex ran real probes on the live bundle this time. BLOCKED, 2.
+# Both accepted; C0-16 is a correction to the BUILDER's own reasoning.
+# ---------------------------------------------------------------------------
+
+iteration_4:
+  verdict: BLOCKED
+  reviewer_ran: >
+    check_assets against the live bundle plus relative, absolute, trailing-separator
+    and Windows case-only path spellings (all resolved to the canonical path, exit 0);
+    discovery_for with a relative path; traced assets-as-file, non-UTF8, hardlink and
+    manifest-inside-bundle paths. pytest again blocked by the read-only sandbox.
+    C0-13 was correctly NOT repeated after checking the fixture.
+  findings:
+    - id: C0-15
+      severity: high
+      result: ACCEPTED
+      problem: >
+        assets/ was never validated. It could be a file, a junction to another
+        course, or contain directories wearing image names — each SHRINKING the
+        set of assets believed to exist, which means fewer dangling references
+        and a cleaner-looking gate.
+      fix: >
+        _assets_on_disk() resolves assets/, requires containment in the bundle,
+        requires a directory, and requires every entry to be a regular file whose
+        resolved path stays inside. A MISSING assets/ stays legal — an early
+        bundle may declare everything to-be-created, and those references still
+        surface as TO-CREATE or DANGLING.
+    - id: C0-16
+      severity: high
+      result: ACCEPTED — the builder's own C0-12 fix was wrong on merits
+      problem: >
+        "zero references + non-empty assets = FAIL" is a heuristic, not an
+        invariant. Reviewer pointed at this repo's own L1-s1 assets directory as
+        the counterexample; verified — it contains _discover.py, _discover2.py and
+        _forensic.py alongside the images. Assets may also be staged before the
+        deck cites them. A gate that cries wolf gets switched off, which is its
+        own fail-open.
+      fix: >
+        Inference replaced with declared policy. asset_discovery gains a REQUIRED
+        expect_references boolean; the gate enforces only what the course declared.
+        Two tests hold both directions, and a third proves the field cannot be
+        omitted.
+      note: >
+        Worth recording: the builder introduced C0-12 while fixing a reviewer
+        finding, and it took the next review to catch that the fix itself
+        installed a false-positive. Fixes need reviewing exactly as much as the
+        original code does.
+
+verification_iteration_4:
+  suite: "180 passed, 1 skipped"
+  real_bundle: "75-bundle/L1-s1 unchanged: 21 present, 1 to create"

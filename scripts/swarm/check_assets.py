@@ -88,12 +88,77 @@ def _refs(
             # into an empty pass. Absence is a configuration error, not a hint.
             missing.append(name)
             continue
-        refs |= set(ref.findall(f.read_text(encoding="utf-8")))
+        try:
+            text = f.read_text(encoding="utf-8")
+        except (UnicodeError, OSError) as exc:
+            # An unreadable source file is a configuration error with a clear
+            # cause, not a traceback. Crashing here also hid the fact that the
+            # audit never examined that file at all.
+            raise DiscoveryError(
+                f"{bundle}: source file {name!r} is not readable as UTF-8 ({exc})"
+            ) from exc
+        refs |= set(ref.findall(text))
     if missing:
         raise DiscoveryError(
             f"{bundle}: configured source file(s) not found: {', '.join(sorted(missing))}"
         )
     return refs
+
+
+def _assets_on_disk(bundle: Path) -> set[str]:
+    """Names of the real asset files in ``bundle/assets``.
+
+    Every case below is a refusal rather than a guess, because each one quietly
+    SHRINKS the set of assets the audit believes exists — and a smaller set means
+    fewer dangling references, which reads as a cleaner gate:
+
+    * ``assets`` present but not a directory (a file, a broken link)
+    * ``assets`` a symlink or junction pointing outside the bundle
+    * an entry that is a directory wearing an image name
+    * an entry whose resolved path escapes the assets directory
+
+    A MISSING ``assets`` directory is not an error: an early bundle may declare
+    every asset as to-be-created. Those references still land in TO-CREATE or
+    DANGLING, so nothing is hidden by allowing it.
+    """
+    assets = bundle / "assets"
+    if not assets.exists():
+        return set()
+
+    root = Path(bundle).resolve()
+    try:
+        resolved = assets.resolve()
+        resolved.relative_to(root)
+    except (OSError, ValueError) as exc:
+        raise DiscoveryError(
+            f"{bundle}: assets/ resolves outside the bundle ({exc}) — refusing to "
+            "count another course's files as this course's assets"
+        ) from exc
+    if not assets.is_dir():
+        raise DiscoveryError(
+            f"{bundle}: assets/ exists but is not a directory. Every reference "
+            "would be reported missing against an empty set."
+        )
+
+    names: set[str] = set()
+    for entry in resolved.iterdir():
+        try:
+            target = entry.resolve()
+            target.relative_to(resolved)
+        except (OSError, ValueError) as exc:
+            raise DiscoveryError(
+                f"{bundle}: assets/{entry.name} resolves outside assets/ ({exc})"
+            ) from exc
+        if target.is_dir():
+            raise DiscoveryError(
+                f"{bundle}: assets/{entry.name} is a directory, not an asset file"
+            )
+        if not target.is_file():
+            raise DiscoveryError(
+                f"{bundle}: assets/{entry.name} is not a regular file (broken link?)"
+            )
+        names.add(entry.name)
+    return names
 
 
 def _audit(
@@ -103,11 +168,13 @@ def _audit(
 ) -> tuple[list[str], list[str], list[str]]:
     refs = _refs(bundle, ref, source_files)
 
-    assets = bundle / "assets"
-    have = {p.name for p in assets.iterdir()} if assets.is_dir() else set()
+    have = _assets_on_disk(bundle)
 
     manifest = bundle / "SOURCES.md"
-    declared = manifest.read_text(encoding="utf-8") if manifest.exists() else ""
+    try:
+        declared = manifest.read_text(encoding="utf-8") if manifest.exists() else ""
+    except (UnicodeError, OSError) as exc:
+        raise DiscoveryError(f"{bundle}: SOURCES.md is not readable as UTF-8 ({exc})") from exc
 
     ok, to_create, dangling = [], [], []
     for r in sorted(refs):
@@ -126,10 +193,7 @@ def _unused(
     source_files: tuple[str, ...],
 ) -> list[str]:
     refs = _refs(bundle, ref, source_files)
-    assets = bundle / "assets"
-    if not assets.is_dir():
-        return []
-    return sorted(p.name for p in assets.iterdir() if p.name not in refs)
+    return sorted(_assets_on_disk(bundle) - refs)
 
 
 def audit(bundle: Path) -> tuple[list[str], list[str], list[str]]:
@@ -142,7 +206,7 @@ def unused(bundle: Path) -> list[str]:
     return _unused(bundle, REF, SOURCE_FILES)
 
 
-def discovery_for(bundle: Path) -> tuple[re.Pattern[str], tuple[str, ...]]:
+def discovery_for(bundle: Path) -> tuple[re.Pattern[str], tuple[str, ...], bool]:
     """Resolve discovery at call time from the nearest course.yaml above ``bundle``.
 
     Fails closed. There is no default and no fallback: auditing a course with
@@ -152,7 +216,8 @@ def discovery_for(bundle: Path) -> tuple[re.Pattern[str], tuple[str, ...]]:
     for candidate in (current, *current.parents):
         if (candidate / MANIFEST_NAME).is_file():
             course = config.load_course(candidate)
-            return course.asset_discovery.ref, course.asset_discovery.source_files
+            d = course.asset_discovery
+            return d.ref, d.source_files, d.expect_references
     raise DiscoveryError(
         f"no {MANIFEST_NAME} found at or above {current}. Asset discovery is "
         "course-specific and has no default; create the manifest rather than "
@@ -166,7 +231,7 @@ def main(argv: list[str]) -> int:
         return 2
     bundle = Path(argv[1])
     try:
-        ref, source_files = discovery_for(bundle)
+        ref, source_files, expect_references = discovery_for(bundle)
     except (DiscoveryError, config.CourseConfigError) as exc:
         print(f"check_assets: {exc}", file=sys.stderr)
         return 2
@@ -190,18 +255,20 @@ def main(argv: list[str]) -> int:
         return 1
 
     # A pattern can compile, carry exactly one capture group, and still match
-    # nothing — schema validation cannot tell a working pattern from a typo'd
-    # one. The observable signature of that mistake is "no references found
-    # anywhere, yet the assets directory is full", so treat it as the
-    # misconfiguration it almost always is. A genuinely empty bundle has nothing
-    # on disk either and still passes; a bundle whose assets nothing references
-    # is a defect in its own right.
-    if not (ok or to_create) and unused_now:
+    # nothing, and schema validation cannot tell that from a working one.
+    #
+    # The previous version INFERRED the mistake from "no references, yet assets/
+    # is full". That is not an invariant: assets/ legitimately also holds helper
+    # scripts and intermediate frames (this repo's own L1-s1 assets directory
+    # contains three), and a bundle may stage assets before the deck cites them.
+    # A gate that cries wolf gets switched off, which is its own fail-open.
+    #
+    # So the course DECLARES the expectation and the gate enforces only that.
+    if expect_references and not (ok or to_create):
         print(
-            f"\nFAIL: discovery matched no references at all, yet "
-            f"{len(unused_now)} file(s) sit in assets/. The configured "
-            f"asset_ref_pattern or asset_source_files almost certainly do not "
-            f"match this course."
+            "\nFAIL: this course declares expect_references: true, but discovery "
+            "matched no asset references at all. Either asset_ref_pattern or "
+            "asset_source_files does not match this bundle."
         )
         return 1
 

@@ -33,6 +33,7 @@ class AssetDiscovery:
 
     ref: re.Pattern[str]
     source_files: tuple[str, ...]
+    expect_references: bool
 
 
 @dataclass(frozen=True)
@@ -68,7 +69,9 @@ _TOP_LEVEL_FIELDS = frozenset(
     }
 )
 _STAGE_FIELDS = frozenset({"digest", "digest_assets", "provenance", "receipts"})
-_DISCOVERY_FIELDS = frozenset({"asset_ref_pattern", "asset_source_files"})
+_DISCOVERY_FIELDS = frozenset(
+    {"asset_ref_pattern", "asset_source_files", "expect_references"}
+)
 
 
 def _mapping(value: Any, field: str, source: Path) -> dict[str, Any]:
@@ -141,7 +144,19 @@ def _asset_discovery(raw: Any, source: Path) -> AssetDiscovery:
                 f"{source}: asset_discovery.asset_source_files entry {name!r} must be one "
                 "file name inside the bundle"
             )
-    return AssetDiscovery(ref=ref, source_files=tuple(files_raw))
+    # Declared policy, not an inferred one. A pattern can compile, carry one
+    # capture group, and still match nothing; the gate cannot tell that from a
+    # bundle whose assets are legitimately staged before the deck cites them.
+    # So the course states which it is, and the gate enforces only that.
+    expect = data["expect_references"]
+    if not isinstance(expect, bool):
+        raise CourseConfigError(
+            f"{source}: asset_discovery.expect_references must be true or false — "
+            "state whether a bundle in this course is expected to reference assets"
+        )
+    return AssetDiscovery(
+        ref=ref, source_files=tuple(files_raw), expect_references=expect
+    )
 
 
 def load_course(root: Path) -> CourseConfig:
