@@ -104,17 +104,34 @@ session: <id>
 specialist: ev3
 verdict: APPROVED | BLOCKED
 claims:
-  - claim: <statement>
-    status: SOURCED | NEEDS_SOURCING | UNVERIFIED | REFUTED
-    # per knowledge/ev3/intake-schema.yaml claim_card.fields_by_status:
-    #   SOURCED   -> both required
-    #   REFUTED   -> both required (keep the source that refuted it)
-    #   UNVERIFIED-> source_id optional; locator required if source_id present
-    #   NEEDS_SOURCING -> both null
-    source_id: "<see fields_by_status>"
-    locator: "<see fields_by_status>"
+  # One example per status, because a single row with a status UNION and
+  # placeholder citations is copyable into a violation: NEEDS_SOURCING with a
+  # non-null source_id contradicts the rules it sits under. Rules are canonical in
+  # knowledge/ev3/intake-schema.yaml claim_card.fields_by_status.
+  - claim: <a statement a cited source supports>
+    status: SOURCED            # both fields required
+    source_id: <key into knowledge/ev3/source-catalog.yaml>
+    locator: <page / section / timestamp / part number>
     applicability: <which kit/firmware/software — never omitted>
     confidence: high | medium | low
+  - claim: <a statement a cited source contradicts>
+    status: REFUTED            # both required — the source that REFUTED it
+    source_id: <the contradicting source>
+    locator: <where it contradicts the claim>
+    applicability: <which kit/firmware/software>
+    confidence: high | medium | low
+  - claim: <sourced, but applicability to our kit is unconfirmed>
+    status: UNVERIFIED         # source_id optional; locator required if present
+    source_id: <the source, kept — do not drop it>
+    locator: <page / section>
+    applicability: <what is unconfirmed, and against what>
+    confidence: medium | low
+  - claim: <nothing has been cited for this at all>
+    status: NEEDS_SOURCING     # both null. Not "left out" — explicitly null.
+    source_id: null
+    locator: null
+    applicability: <which kit/firmware/software it would need to hold for>
+    confidence: low
 # approval_record and review_receipt are the canonical structures from
 # knowledge/ev3/intake-schema.yaml. A free-standing `review:` map used to appear
 # here instead, which could not express council evidence or an owner-business

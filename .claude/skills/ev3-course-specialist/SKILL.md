@@ -121,7 +121,8 @@ and cannot judge lesson content or assets. Two things only may reach him:
 
 Everything else — QC, defect-finding, defect-fixing, asset selection, image
 placement, content critique — is `approval.kind: specialist_council`, satisfied
-by specialist plus refuter plus reviewer. **Never hand the owner a defect that an
+by specialist plus reviewer, and by a distinct refuter as well for any
+high-severity call. **Never hand the owner a defect that an
 agent can resolve.**
 
 A `physical_action_required` request asks for label text, quantities, and
@@ -151,9 +152,10 @@ No micro:bit precedent. Candidate shapes only, all `NEEDS_SOURCING`: motor in th
 port, wheel mounted backwards, sensor aimed wrong, cable in the wrong socket. None of
 these has been checked against a source or against a real kit.
 
-`UNVERIFIED:` **which physical faults are safe and reversible for an 8-to-10-year-old
-to induce and undo.** This needs sourcing before any physical bug is used in a
-session. Do not select physical bugs by judgment — that is exactly the inference
+`NEEDS_SOURCING:` **which physical faults are safe and reversible for an
+8-to-10-year-old to induce and undo.** Nothing has been cited for this at all, so
+it is unsourced, not sourced-and-unconfirmed. It must be sourced before any
+physical bug is used in a session. Do not select physical bugs by judgment — that is exactly the inference
 §1 forbids, with a child and hardware on the other end.
 
 ### Rules that carry unchanged
@@ -214,10 +216,12 @@ Every box below is checked **by you, by hand**. See §9: almost none of it is
 enforced by a gate today. A checked box is a statement you are making, not a
 test that passed.
 
-- [ ] every externally checkable statement has `source_id` plus exact locator
-- [ ] every unsettled detail carries `NEEDS_SOURCING`, not a guess
+- [ ] every statement carries exactly ONE of the four canonical statuses, and its
+      `source_id`/`locator` satisfy `claim_card.fields_by_status` for that status
+- [ ] `UNVERIFIED` and `NEEDS_SOURCING` were kept apart — sourced-but-unconfirmed
+      is not the same as unsourced, and they have different remedies
 - [ ] applicability checked against `knowledge/ev3/physical-inventory.yaml`;
-      mismatch or unknown implies `UNVERIFIED`
+      mismatch or unknown implies `UNVERIFIED` with the source kept, not dropped
 - [ ] no part, port, block, limit, compatibility, or behaviour was inferred
 - [ ] every physical-outcome claim is `UNVERIFIED` until an observation receipt
       links captured media
