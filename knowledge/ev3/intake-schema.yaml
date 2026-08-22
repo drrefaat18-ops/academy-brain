@@ -42,6 +42,7 @@ status_values:
   REFUTED:          "A source contradicts it. Routed to 55-refuted/."
 
 confidence_values: [high, medium, low]
+severity_values: [high, medium, low]
 
 source_tiers:
   1: "Official manufacturer material. May establish a fact."
@@ -89,6 +90,11 @@ claim_card:
     status:        "one of status_values"
     applicability: "which kit / firmware / software version this holds for"
     confidence:    "one of confidence_values"
+    severity:      "one of severity_values — how much damage a wrong call would do.
+                    This is the field the high-severity-needs-a-refuter rules key
+                    off: approval_record.required_when_specialist_council.refuter,
+                    the approval_record validation list, and the specialist_receipt
+                    review_receipt rule below all test claim_card.severity == high."
   # D3-04: stated per status so the prose files cannot drift into their own
   # readings. A REFUTED claim MUST keep the source that refuted it — an earlier
   # draft forced both fields to null for every non-SOURCED status, which threw
@@ -331,14 +337,21 @@ approval_record:
     council_evidence:
       specialist: "actor name"
       reviewer:   "actor name — MUST differ from specialist"
-      refuter:    "actor name — required for high-severity calls; MUST differ from both"
+      refuter:    "actor name — required when any claim under review has claim_card.severity: high; MUST differ from both"
   required_when_owner_business:
     category:  "must be one of owner_business_categories"
     why_not_technical: "one sentence establishing no amount of sourcing or analysis could settle it"
+  required_when_physical_action_required:
+    # The act cannot live as prose inside subject: it must resolve to a
+    # physical_request record (section 5) — request_id, kind (one of
+    # physical_request_kinds), target, and the per-kind fields stating the ask
+    # in plain language ("photograph label", "transcribe label text",
+    # "count units").
+    request_id: "must resolve to a physical_request record"
   validation:
     - "kind: owner_business with a category outside the enumerated list is invalid"
     - "kind: specialist_council with specialist == reviewer is invalid regardless of verdict"
-    - "a high-severity call with no refuter is invalid"
+    - "a call on a claim whose claim_card.severity is high, with no refuter, is invalid"
 
 # D3-02: the enclosing receipt shape. The agent file previously invented this
 # envelope because the schema never defined one, so "the files agree exactly"
@@ -360,8 +373,8 @@ specialist_receipt:
     # satisfy every stated rule.
     review_receipt: >
       LIST of review_receipt records, at least one with role: reviewer. A run
-      carrying any high-severity claim additionally requires a role: refuter
-      record. A run can carry both passes; it may never carry none.
+      carrying any claim whose claim_card.severity is high additionally requires
+      a role: refuter record. A run can carry both passes; it may never carry none.
   validation:
     # D3-05: UNVERIFIED is a non-shipping status per status_values above, so a
     # run carrying a required UNVERIFIED claim must not report APPROVED.
@@ -377,7 +390,7 @@ specialist_receipt:
     - "known_deadlock: claims depending on academy-kit applicability cannot reach APPROVED until physical-inventory.yaml exists (plan step F2); inventory-independent claims are unaffected"
     - "review_receipt is a list, never a bare mapping"
     - "verdict APPROVED with no review_receipt is invalid"
-    - "verdict APPROVED covering a high-severity claim with no role: refuter record is invalid"
+    - "verdict APPROVED covering a claim whose claim_card.severity is high, with no role: refuter record, is invalid"
   status: NOT_ENFORCED
 
 review_receipt:
@@ -389,7 +402,7 @@ review_receipt:
     inputs:     "what was actually read"
     verdict:    "APPROVED | BLOCKED"
     citations:  "the source_ids checked"
-    severity_covered: "which severities this pass covered; high-severity requires a refuter pass"
+    severity_covered: "which severities this pass covered; a pass covering a claim with claim_card.severity: high requires a refuter"
 
 # 15 — nothing today records who wrote localized text, so the non-Claude Arabic
 # rule (00-contracts/rubric.md:59-66) cannot be checked at all.

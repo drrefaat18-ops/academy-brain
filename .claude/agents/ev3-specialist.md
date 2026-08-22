@@ -82,7 +82,7 @@ Omitting `status` makes SOURCED and NEEDS_SOURCING indistinguishable.
 
 - Never author Arabic.
 - Never take a photograph. Write the shot list instead.
-- Never decide pricing, schedule, licensing exceptions, or purchases.
+- Never decide pricing, schedule, licensing exceptions, purchases, or vendor relationships.
 - Never infer a part, port, block, limit, compatibility, or behaviour.
 - Never route an agent-resolvable defect to the owner.
 
