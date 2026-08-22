@@ -1,0 +1,182 @@
+"""§5b overlay: the half of the reserved-region contract that was never built.
+
+The regression these guard: L1-s1 reserved regions for assets that were already on
+disk, then shipped the deck with empty dashed boxes in it.
+"""
+
+import pytest
+from pptx import Presentation
+from pptx.util import Emu
+
+from swarm import overlay
+
+def _png(tmp_path, name="img.png", size=(64, 64)):
+    """A real, decodable PNG.
+
+    A hand-rolled 1x1 byte string is not enough: python-pptx embeds image bytes
+    without decoding them, but MuPDF actually parses the image, so a malformed
+    fixture passes the PPTX tests and fails only on the PDF path — which is the
+    path production uses.
+    """
+    from PIL import Image
+
+    p = tmp_path / name
+    Image.new("RGB", size, (200, 30, 30)).save(p)
+    return p
+
+
+def _deck(tmp_path, *texts, name="deck.pptx"):
+    """One slide per text, each carrying that text in a textbox."""
+    prs = Presentation()
+    for t in texts:
+        slide = prs.slides.add_slide(prs.slide_layouts[5])
+        box = slide.shapes.add_textbox(Emu(914400), Emu(914400), Emu(2743200), Emu(1828800))
+        box.text_frame.text = t
+    path = tmp_path / name
+    prs.save(str(path))
+    return path
+
+
+def test_finds_every_reserved_region_in_slide_order(tmp_path):
+    deck = _deck(
+        tmp_path,
+        "[Reserved Image Area: bug-1]",
+        "nothing reserved here",
+        "[Reserved Image Area: bug-2]",
+    )
+    regions = overlay.find_regions(deck)
+    assert [(r.slide_index, r.aid) for r in regions] == [(1, "bug-1"), (3, "bug-2")]
+
+
+def test_unfilled_deck_fails_closed(tmp_path):
+    deck = _deck(tmp_path, "[Reserved Image Area: bug-1]")
+    with pytest.raises(overlay.OverlayError, match="bug-1"):
+        overlay.assert_filled(deck)
+
+
+def test_clean_deck_passes(tmp_path):
+    overlay.assert_filled(_deck(tmp_path, "an ordinary slide"))
+
+
+def test_overlay_fills_region_and_removes_placeholder(tmp_path):
+    deck = _deck(tmp_path, "[Reserved Image Area: bug-1]")
+    out = tmp_path / "out.pptx"
+
+    assert overlay.overlay(deck, {"bug-1": _png(tmp_path)}, out=out) == ["bug-1"]
+
+    assert overlay.find_regions(out) == []
+    overlay.assert_filled(out)
+    pics = [s for s in Presentation(str(out)).slides[0].shapes if s.shape_type == 13]
+    assert len(pics) == 1
+
+
+def test_unmapped_region_is_an_error_not_a_skip(tmp_path):
+    """The original defect: an empty region that nothing complained about."""
+    deck = _deck(tmp_path, "[Reserved Image Area: bug-1]")
+    with pytest.raises(overlay.OverlayError, match="no resolvable asset"):
+        overlay.overlay(deck, {}, out=tmp_path / "out.pptx")
+
+
+def test_mapped_asset_missing_on_disk_is_an_error(tmp_path):
+    deck = _deck(tmp_path, "[Reserved Image Area: bug-1]")
+    with pytest.raises(overlay.OverlayError, match="no resolvable asset"):
+        overlay.overlay(deck, {"bug-1": tmp_path / "gone.png"}, out=tmp_path / "out.pptx")
+
+
+def test_partial_fill_still_fails_closed(tmp_path):
+    """Two regions, one asset: the run must fail, not deliver one empty box."""
+    deck = _deck(
+        tmp_path, "[Reserved Image Area: bug-1]", "[Reserved Image Area: bug-2]"
+    )
+    with pytest.raises(overlay.OverlayError, match="bug-2"):
+        overlay.overlay(deck, {"bug-1": _png(tmp_path)}, out=tmp_path / "out.pptx")
+
+
+def test_colliding_regions_in_one_shape_are_refused(tmp_path):
+    deck = _deck(tmp_path, "[Reserved Image Area: bug-1] [Reserved Image Area: bug-2]")
+    with pytest.raises(overlay.OverlayError, match="must not collide"):
+        overlay.overlay(deck, {}, out=tmp_path / "out.pptx")
+
+
+def test_image_is_not_distorted_to_fill_the_box(tmp_path):
+    """A stretched screenshot of code is a wrong screenshot."""
+    deck = _deck(tmp_path, "[Reserved Image Area: bug-1]")
+    out = tmp_path / "out.pptx"
+    overlay.overlay(deck, {"bug-1": _png(tmp_path)}, out=out)
+
+    pic = [s for s in Presentation(str(out)).slides[0].shapes if s.shape_type == 13][0]
+    # source png is square, so the placed picture must be square too
+    assert pic.width == pic.height
+
+
+def test_missing_deck_is_an_error(tmp_path):
+    with pytest.raises(overlay.OverlayError, match="no deck at"):
+        overlay.overlay(tmp_path / "nope.pptx", {})
+
+
+# --------------------------------------------------------------------------
+# PDF — the format _run_pass actually downloads. These are the ones that matter.
+# --------------------------------------------------------------------------
+
+import fitz
+
+
+def _pdf(tmp_path, *texts, name="deck.pdf"):
+    """One page per text."""
+    doc = fitz.open()
+    for t in texts:
+        page = doc.new_page()
+        page.insert_text((72, 144), t, fontsize=14)
+    path = tmp_path / name
+    doc.save(str(path))
+    doc.close()
+    return path
+
+
+def test_pdf_finds_reserved_regions(tmp_path):
+    deck = _pdf(tmp_path, "[Reserved Image Area: bug-1]", "ordinary page")
+    regions = overlay.find_regions(deck)
+    assert [(r.slide_index, r.aid) for r in regions] == [(1, "bug-1")]
+    assert regions[0].width > 0 and regions[0].height > 0
+
+
+def test_pdf_unfilled_fails_closed(tmp_path):
+    deck = _pdf(tmp_path, "[Reserved Image Area: bug-1]")
+    with pytest.raises(overlay.OverlayError, match="page 1: bug-1"):
+        overlay.assert_filled(deck)
+
+
+def test_pdf_overlay_fills_and_marker_is_gone(tmp_path):
+    deck = _pdf(tmp_path, "[Reserved Image Area: bug-1]")
+    out = tmp_path / "out.pdf"
+
+    assert overlay.overlay(deck, {"bug-1": _png(tmp_path)}, out=out) == ["bug-1"]
+
+    assert overlay.find_regions(out) == []
+    overlay.assert_filled(out)
+    with fitz.open(str(out)) as doc:
+        assert len(doc[0].get_images()) == 1
+
+
+def test_pdf_unmapped_region_is_an_error(tmp_path):
+    deck = _pdf(tmp_path, "[Reserved Image Area: bug-1]")
+    with pytest.raises(overlay.OverlayError, match="no resolvable asset"):
+        overlay.overlay(deck, {}, out=tmp_path / "out.pdf")
+
+
+def test_pdf_partial_fill_fails_closed(tmp_path):
+    deck = _pdf(tmp_path, "[Reserved Image Area: bug-1]", "[Reserved Image Area: bug-2]")
+    with pytest.raises(overlay.OverlayError, match="bug-2"):
+        overlay.overlay(deck, {"bug-1": _png(tmp_path)}, out=tmp_path / "out.pdf")
+
+
+def test_unknown_format_is_refused_not_guessed(tmp_path):
+    odd = tmp_path / "deck.docx"
+    odd.write_bytes(b"not a deck")
+    with pytest.raises(overlay.OverlayError, match="unsupported deck format"):
+        overlay.find_regions(odd)
+
+
+def test_missing_deck_is_an_error_for_find_too(tmp_path):
+    with pytest.raises(overlay.OverlayError, match="no deck at"):
+        overlay.find_regions(tmp_path / "nope.pdf")

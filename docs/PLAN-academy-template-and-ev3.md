@@ -176,7 +176,17 @@ New deterministic gates this implies: ordered-step continuity, required step cou
 **Both a doctrine skill and a callable subagent definition, generated from one neutral source.** A skill alone is not callable as an agent by codex/opencode; a Claude-only subagent definition is not readable by the other providers.
 
 - `.claude/skills/ev3-course-specialist/SKILL.md` — operating rules, source hierarchy, citation policy, owned decisions, output schemas, uncertainty rules, QA checklist.
-- `.claude/agents/ev3-specialist.md` + provider adapters generated from one neutral definition — role, allowed reads/writes, required skill, inputs, outputs, stop conditions.
+- `.claude/agents/ev3-specialist.md` — role, allowed reads/writes, required skill, inputs, outputs, stop conditions.
+
+  **AMENDED 2026-08-22, lane D, after adversarial review.** The original wording said
+  "provider adapters generated from one neutral definition". Built instead as a single
+  file with no generator and no per-provider copies: all three providers are handed this
+  exact path. Reason: a generator with one output is machinery guarding against drift
+  that cannot occur while only one artifact exists — and a generator that emits three
+  copies *creates* the drift risk it claims to prevent. Revisit when a provider
+  demonstrably cannot consume this file, at which point the generator has a real job.
+  `UNVERIFIED:` codex has read this file directly (2026-08-22); opencode has not yet
+  been tested against it.
 - `knowledge/ev3/` — `source-catalog.yaml` (URL/file, version/date, license, hardware+software applicability, confidence), extracted claim cards, applicability matrix, academy kit inventory, glossary, known-unknowns. **Model memory is never a source.** Official manufacturer material is the primary tier; academy observation proves the actual kit; third-party is supplementary and needs provenance review.
 
 **Owns:** prerequisite graph, terminology, technical objectives, build→program→test sequence, misconception list, troubleshooting tree, sourced safety notes, feasibility, evidence/shot requirements, technical acceptance criteria, technical critique and patch recommendations.
@@ -318,6 +328,15 @@ Also preserve the *process* that caught them: render every PDF to frames, inspec
 - **F1** — Codex sources manufacturer/official EV3 facts now. Unsettled facts remain `NEEDS_SOURCING` or `UNVERIFIED`.
 - **F2** — Inventory the physical academy kit only when a person can inspect it. This alone is `physical_action_required`: request only label text, quantities, and photographs of identifying labels, never robotics judgment.
 - **G** — One pilot session end-to-end through gates before scaling.
+- **H** — *(opened 2026-08-22 by codex's review of lane D)* Build the EV3 validators the
+  doctrine currently only promises: claim-card schema validation and source resolution,
+  applicability matching against the kit inventory, physical-evidence receipt and hash
+  checks, seeded-bug ladder validation, procedural-sequence continuity (unique steps
+  `1..N`, exactly `N-1` transitions, one declared direction), localisation-authorship
+  provenance, and typed approval routing. Until H lands,
+  `.claude/skills/ev3-course-specialist/SKILL.md` §9 records every rule as NOT ENFORCED
+  rather than claiming enforcement it does not have. H is gated on the EV3 content
+  arriving — validating a schema nothing produces yet is premature.
 
 Archiving happens inside **A**, before the refactor's fixtures exist only in archived form — hence step 4 of §6 creating the sanitized fixture is a prerequisite of **B**, not an afterthought.
 
@@ -357,6 +376,7 @@ temp-course files are E outputs, not source edits.
 | File path | Owning lane | Owning builder |
 |---|---|---|
 | `75-bundle/_TEMPLATE-debugging-lab.md` | A | claude |
+| `course.yaml` | B | codex |
 | `scripts/swarm/config.py` | B | codex |
 | `scripts/swarm/paths.py` | B | codex |
 | `tests/test_paths.py` | B | codex |
@@ -364,11 +384,15 @@ temp-course files are E outputs, not source edits.
 | `scripts/swarm/check_assets.py` | C0 | opencode |
 | `tests/test_check_assets.py` | C0 | opencode |
 | `scripts/swarm/generate_session.py` | C1 | claude |
+| `scripts/swarm/overlay.py` | C1 | claude |
+| `pyproject.toml` | C1 | claude |
+| `tests/test_overlay.py` | C1 | claude |
 | `tests/test_generate_session.py` | C1 | claude |
 | `00-contracts/brand-and-output.md` | C4 | opencode |
 | `00-contracts/rubric.md` | C4 | opencode |
 | `75-bundle/_TEMPLATE-blueprint.md` | C4 | opencode |
 | `.claude/skills/ev3-course-specialist/SKILL.md` | D | claude |
+| `.claude/agents/ev3-specialist.md` | D | claude |
 | `knowledge/ev3/intake-schema.yaml` | D | claude |
 | `scripts/swarm/new_course.py` | E | codex |
 | `tests/test_new_course.py` | E | codex |

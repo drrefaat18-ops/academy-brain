@@ -158,23 +158,127 @@ def parse_asset_mapping(text: str) -> list[Asset]:
     return assets
 
 
-def enforce_blueprint_gate(path: Path) -> None:
-    """DEC-027: the owner approves the content before any quota is spent.
+APPROVAL_KINDS: frozenset[str] = frozenset(
+    {"specialist_council", "owner_business", "physical_action_required"}
+)
 
-    This is the gate that made 'start s1' feel effortless in the original EthOS —
-    not the shortness of the command, but that every content decision was already
-    settled before it was typed.
+_GAP_RE = re.compile(r"^GAP - (\S+)", re.M)
+_LEGACY_GAP = "GAP - owner must decide"
+
+
+def enforce_blueprint_gate(path: Path) -> None:
+    """DEC-027, retyped: the content is settled before any quota is spent.
+
+    The original gate demanded *owner* approval for everything, which routed
+    agent-resolvable technical decisions to a pharmacist and contradicted the
+    standing owner rule in `00-contracts/agent-memory.md`. The gate still refuses
+    unsettled content — that part made 'start s1' feel effortless — but it now
+    asks *who* was competent to settle it.
+
+    `approval.kind` must be one of APPROVAL_KINDS:
+      specialist_council       technical/content decisions (specialist + refuter + reviewer)
+      owner_business           genuinely undecidable business judgment
+      physical_action_required a literal physical act
+
+    Unresolved gaps must name their routing the same way. The bare legacy marker
+    is itself refused: it asserts the owner must decide without establishing that
+    the decision is actually his.
     """
     if not path.is_file():
-        raise HardStop(f"no blueprint at {path} — the owner has approved nothing yet")
+        raise HardStop(f"no blueprint at {path} — nothing has been approved yet")
     text = path.read_text(encoding="utf-8")
+
     status = re.search(r"^status:\s*(.+)$", text, re.M)
     state = status.group(1).strip().strip("\"'") if status else "(no status field)"
     if "approved" not in state.lower() or "awaiting" in state.lower():
-        raise HardStop(f"blueprint status is {state!r} — the owner has not approved it")
-    open_gaps = text.count("GAP - owner must decide")
-    if open_gaps:
-        raise HardStop(f"blueprint still has {open_gaps} unresolved 'GAP - owner must decide'")
+        raise HardStop(f"blueprint status is {state!r} — it has not been approved")
+
+    kind_m = re.search(r"^\s*kind:\s*(\S+)", text, re.M)
+    kind = kind_m.group(1).strip().strip("\"'") if kind_m else None
+    if kind is None:
+        raise HardStop(
+            "blueprint has no approval.kind — state who was competent to approve it, "
+            f"one of {sorted(APPROVAL_KINDS)}"
+        )
+    if kind not in APPROVAL_KINDS:
+        raise HardStop(
+            f"blueprint approval.kind is {kind!r} — expected one of {sorted(APPROVAL_KINDS)}"
+        )
+
+    if _LEGACY_GAP in text:
+        raise HardStop(
+            f"blueprint uses the untyped marker {_LEGACY_GAP!r}. Route it: "
+            "'GAP - specialist_council' for anything an agent can settle, "
+            "'GAP - owner_business' or 'GAP - physical_action_required' only for "
+            "the two things that genuinely reach the owner."
+        )
+
+    gaps = _GAP_RE.findall(text)
+    if gaps:
+        mistyped = sorted({g for g in gaps if g not in APPROVAL_KINDS})
+        if mistyped:
+            raise HardStop(
+                f"blueprint has GAP markers with unknown routing: {mistyped} — "
+                f"expected one of {sorted(APPROVAL_KINDS)}"
+            )
+        raise HardStop(
+            f"blueprint still has {len(gaps)} unresolved gap(s): "
+            + ", ".join(f"GAP - {g}" for g in sorted(gaps))
+        )
+
+
+_SLIDE_HEAD = re.compile(r"^#{1,3}\s*Slide\s+(\S+)", re.M)
+_SLIDE_ASSET = re.compile(r"\*\*Asset:\*\*\s*`([^`]+)`")
+
+
+def reconcile_slides(bundle: Path, assets: list[Asset]) -> None:
+    """§5b: reconcile the slide list against assets that resolve ON DISK, before generating.
+
+    Owner ruling, 2026-08-21: "just don't build it in the first place." NotebookLM
+    quota is the scarce resource, so a pass that generates and *then* discovers a
+    hole has already spent a slot. This check is local and free, and it runs before
+    a single token is written.
+
+    A slide may never enter the prompt carrying a reference to something that does
+    not exist. When one does, the fix is one of three — redesign, substitute, or
+    drop — and it is made here, not after the quota is gone.
+    """
+    source = bundle / "slides-source.md"
+    if not source.is_file():
+        raise HardStop(f"no slides-source.md at {source} — nothing to reconcile")
+    text = source.read_text(encoding="utf-8")
+
+    # aid as written in ASSET-MAPPING, and the same key with an image extension,
+    # because slides cite the filename while the mapping cites the id.
+    resolved: set[str] = set()
+    for a in assets:
+        if a.path.is_file():
+            resolved.add(a.aid)
+            resolved.add(a.path.name)
+            resolved.add(a.path.stem)
+
+    # walk slide by slide so the error names the slide, not just the file
+    positions = [(m.start(), m.group(1)) for m in _SLIDE_HEAD.finditer(text)]
+    bounds = positions + [(len(text), None)]
+
+    holes: list[str] = []
+    for i, (start, slide) in enumerate(positions):
+        body = text[start : bounds[i + 1][0]]
+        for ref in _SLIDE_ASSET.findall(body):
+            key = ref.strip()
+            if key in resolved or Path(key).stem in resolved:
+                continue
+            holes.append(f"slide {slide}: `{key}`")
+
+    if holes:
+        raise HardStop(
+            "slide/asset reconciliation failed — "
+            + "; ".join(holes)
+            + ". Fix BEFORE generating, one of: redesign the slide so it does not "
+            "need the asset, substitute an existing asset carrying the same meaning, "
+            "or drop the slide and renumber. Do not generate and patch afterwards — "
+            "that spends a quota slot on a deck with a known hole."
+        )
 
 
 def enforce_asset_gate(assets: list[Asset]) -> None:
@@ -455,15 +559,24 @@ def _demo() -> None:
     assert assets[1].aid == "img-20-bug1" and not assets[1].produced
     assert assets[0].path.is_absolute()
 
-    # the blueprint gate refuses anything short of a clean owner approval
+    # the blueprint gate refuses anything short of a clean, correctly-typed approval
     import tempfile
+
+    _OK = "---\nstatus: approved\napproval:\n  kind: specialist_council\n---\n"
 
     with tempfile.TemporaryDirectory() as td:
         bp = Path(td) / "blueprint.md"
         for body, why in (
             ("---\nstatus: draft-awaiting-owner-approval\n---\n", "draft"),
-            ("---\nstatus: approved\n---\nGAP - owner must decide\n", "open gap"),
             ("---\ntype: blueprint\n---\n", "no status field"),
+            ("---\nstatus: approved\n---\n", "approved with no approval.kind"),
+            (
+                "---\nstatus: approved\napproval:\n  kind: vibes\n---\n",
+                "unknown approval kind",
+            ),
+            (_OK + "GAP - owner must decide\n", "untyped legacy owner gap"),
+            (_OK + "GAP - somebody\n", "gap with unknown routing"),
+            (_OK + "GAP - specialist_council\n", "open typed gap"),
         ):
             bp.write_text(body, encoding="utf-8")
             try:
@@ -472,8 +585,21 @@ def _demo() -> None:
                 pass
             else:  # pragma: no cover
                 raise AssertionError(f"blueprint gate let {why} through")
-        bp.write_text("---\nstatus: approved\n---\nall settled\n", encoding="utf-8")
-        enforce_blueprint_gate(bp)
+
+        # the legacy marker is refused by name, so the message tells the author where to route it
+        bp.write_text(_OK + "GAP - owner must decide\n", encoding="utf-8")
+        try:
+            enforce_blueprint_gate(bp)
+        except HardStop as exc:
+            assert "specialist_council" in str(exc), exc
+
+        # all three routings are accepted as approval kinds
+        for kind in sorted(APPROVAL_KINDS):
+            bp.write_text(
+                f"---\nstatus: approved\napproval:\n  kind: {kind}\n---\nall settled\n",
+                encoding="utf-8",
+            )
+            enforce_blueprint_gate(bp)
 
     # a row that is not yet produced must stop the run, not warn
     try:
@@ -490,6 +616,31 @@ def _demo() -> None:
         assert "missing on disk" in str(exc), exc
     else:  # pragma: no cover
         raise AssertionError("dangling path did not hard-stop")
+
+    # §5b: a slide citing an asset that is not on disk stops the run before any quota
+    with tempfile.TemporaryDirectory() as td:
+        b = Path(td)
+        (b / "assets").mkdir()
+        (b / "assets" / "img-01.png").write_bytes(b"x")
+        (b / "slides-source.md").write_text(
+            "## Slide 3 — fine\n- **Asset:** `img-01.png`\n\n"
+            "## Slide 7 — hole\n- **Asset:** `img-99.png`\n",
+            encoding="utf-8",
+        )
+        present = Asset("img-01", "3", b / "assets" / "img-01.png", "REFERENCE", "Produced and mapped")
+        try:
+            reconcile_slides(b, [present])
+        except HardStop as exc:
+            assert "slide 7" in str(exc) and "img-99.png" in str(exc), exc
+            assert "redesign" in str(exc) and "substitute" in str(exc) and "drop" in str(exc), exc
+        else:  # pragma: no cover
+            raise AssertionError("reconciliation let a missing slide asset through")
+
+        # drop the offending slide and it reconciles
+        (b / "slides-source.md").write_text(
+            "## Slide 3 — fine\n- **Asset:** `img-01.png`\n", encoding="utf-8"
+        )
+        reconcile_slides(b, [present])
 
     p = parse_prompts(_DEMO_PROMPTS)
     assert p == {"deck-a": "pass A body", "summary": "summary body", "deck-b": "pass B body"}, p
@@ -517,6 +668,13 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("session id required")
 
     sid = paths.validate_session_id(args.session)
+    if not paths.produces_artifacts(sid):
+        print(
+            f"HARD STOP: {sid} produces no artifacts under this course's manifest "
+            "(course.yaml: artifact_schedule) — nothing to generate",
+            file=sys.stderr,
+        )
+        return 2
     bundle = VAULT / "75-bundle" / sid
 
     mapping = bundle / "ASSET-MAPPING.md"
@@ -530,6 +688,7 @@ def main(argv: list[str] | None = None) -> int:
         assets = parse_asset_mapping(mapping.read_text(encoding="utf-8"))
         enforce_blueprint_gate(bundle / "blueprint.md")
         enforce_asset_gate(assets)
+        reconcile_slides(bundle, assets)
         plan = build_plan(sid, assets, parse_prompts(prompt_file.read_text(encoding="utf-8")))
         problems = preflight(plan)
         if problems:

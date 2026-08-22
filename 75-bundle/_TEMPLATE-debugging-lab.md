@@ -88,7 +88,7 @@ A debugging lab is not done when the slides are done. It also ships:
 The environmental rows matter as much as the seeded ones. Most classroom
 "bugs" are not in the code.
 
-### Rule 6 — hard verification (`blueprint.md:126`)
+### Rule 6 — hard verification (`75-bundle/L1-s1/blueprint.md:126`)
 
 **Production must confirm each seeded program actually reproduces its stated
 symptom.** Run it. Observe it. Record the observation.

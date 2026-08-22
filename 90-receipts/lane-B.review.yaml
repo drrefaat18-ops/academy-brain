@@ -1,0 +1,104 @@
+step: B
+builder: codex
+reviewer: claude
+date: 2026-08-22
+iterations: 2
+verdict: APPROVED
+
+rung1:
+  pytest: PASS                        # 116 passed, run independently by reviewer
+  generate_session_self_check: PASS
+  check_assets_self_check: PASS
+  file_scope: PASS                    # course.yaml, config.py, paths.py, test_paths.py, test_course_config.py
+
+api_approval:
+  status: APPROVED
+  note: >
+    C1 executor work is unblocked. The API C1 consumes is paths.for_root(root) ->
+    CoursePaths, plus the module-level names bound to the vault's own course.yaml.
+
+iteration_1:
+  verdict: BLOCKED
+  blocking: 3
+  advisory: 2
+  findings:
+    - id: B-01
+      severity: blocking
+      problem: >
+        s8 became a fully valid session ID with full path support and nothing encoded
+        the contract rule that s8 generates no artifacts. A fail-closed wrong behaviour
+        was converted into a fail-open one.
+      status: FIXED
+      verified_by: >
+        course.yaml now carries artifact_schedule; CourseConfig.produces_artifacts
+        validates it; paths._artifact_session_id raises on no-artifact sessions.
+        Reviewer confirmed at runtime: digest_path('L1-s8') raises
+        "session 'L1-s8' does not produce artifacts", receipt_path('L1-s8') still
+        resolves (receipts exist for every session, correctly).
+    - id: B-02
+      severity: blocking
+      problem: >
+        No test proved the config drove anything. Every paths test ran against the
+        single real course.yaml and would have passed with the literals still in place.
+      status: FIXED
+      verified_by: >
+        test_for_root_binds_all_path_behavior_to_alternative_course uses levels [3,5],
+        2 sessions, providers [alpha,beta] and stage dirs notes/media/sources/audits,
+        and asserts every path function changes accordingly. Reviewer read the test
+        body; it is a real oracle, not a restatement of the current config.
+    - id: B-03
+      severity: blocking
+      problem: >
+        Config and root were loaded at import time against a __file__-derived
+        VAULT_ROOT, so lane E could not instantiate a course in a temp dir.
+      status: FIXED
+      verified_by: >
+        for_root(root) -> CoursePaths added; module-level names retained as a default
+        binding. All seven existing importers still work — full suite green.
+    - id: B-04
+      severity: advisory
+      status: FIXED
+      verified_by: config.py docstring now states stages are manifest-controlled while lane/merge stages are pipeline-owned.
+    - id: B-05
+      severity: advisory
+      status: FIXED
+      verified_by: test asserts against paths.COURSE.stages.receipts instead of the literal.
+
+follow_ups:
+  - id: B-06
+    severity: advisory
+    opened_by: reviewer
+    file: scripts/swarm/paths.py
+    problem: >
+      lane_path and merged_path now also refuse no-artifact sessions, which blocks
+      every per-provider lane file for s8 — including research and planning lanes.
+      00-contracts/brand-and-output.md:105 says s8 produces no student deck and no
+      summary; it does not say s8 has no pipeline lanes at all.
+    why_not_blocking: >
+      Fails closed and loud, not silent. Resolving it needs the contract to say what
+      "no artifacts" covers, which is a specialist_council call, not a lane-B defect.
+    route: specialist_council
+    settle_in: G (pilot session end-to-end) or a contract clarification, whichever comes first
+
+  - id: B-07
+    severity: advisory
+    opened_by: reviewer
+    problem: >
+      sessions_per_level is a single uniform value across all levels. A course whose
+      L1 and L2 differ in length cannot be expressed.
+    why_not_blocking: no current or planned course needs it; YAGNI until one does.
+    route: specialist_council
+
+notes:
+  - >
+    Codex stayed inside its file scope across both iterations and stopped correctly
+    on iteration 1's original run when course.yaml was missing from the ownership
+    matrix — that gap was the reviewer's, and the matrix was amended rather than the
+    scope silently widened.
+  - >
+    The s8 contract line was independently verified by the reviewer at
+    00-contracts/brand-and-output.md:105.
+  - >
+    Environment fix outside both lanes: python-pptx was missing, so the baseline
+    suite could not collect. Installed; baseline went 104 -> 112 -> 116 passed across
+    the two iterations.

@@ -1,0 +1,110 @@
+step: C0
+builder: opencode
+reviewer: codex
+date: 2026-08-22
+iteration: 1
+verdict: BLOCKED
+graduation: DEFERRED     # reviewer said NOT YET; see graduation_note
+blocking: 4
+advisory: 1
+
+rung1:
+  pytest: PASS            # 131 passed at the time of review, run by claude
+  check_assets_self_check: PASS
+  cli_against_real_bundle: PASS    # 21 present, 1 to create
+  file_scope: PASS        # check_assets.py, tests/test_check_assets.py only
+  note: >
+    Reviewer could not run the suite — codex ran under -s read-only and pytest died
+    with "No usable temporary directory found". Rung 1 was therefore executed by
+    claude instead, and passed. The review is static analysis only, which is
+    recorded rather than glossed.
+
+verified_by_claude:
+  - finding: 2
+    result: CONFIRMED — reproduces
+    evidence: >
+      Set check_assets.REF to a `shot-*` pattern at module level, then called the
+      one-argument audit(bundle) against a bundle containing shot-arm.png. Returned
+      [] where it should have returned ['shot-arm.png']. Binding REF as a default
+      argument value freezes it at definition time, so the module-level override that
+      used to work is now silently dead.
+  - finding: 3
+    result: CONFIRMED — follows directly from the code
+    evidence: >
+      main(argv) calls audit(bundle) and unused(bundle) with no discovery arguments,
+      so the CLI still uses the micro:bit defaults. The generalisation is unreachable
+      from the only documented way to run the tool.
+
+findings:
+  - id: C0-01
+    severity: blocking
+    file: scripts/swarm/check_assets.py
+    line: 22
+    problem: audit() and unused() gained keyword-only parameters, changing the frozen public signatures.
+    claude_assessment: >
+      Technically correct against the brief, which said the signatures keep their
+      "exact current shapes". Weakest of the four on its own — keyword-only params with
+      defaults are source-compatible for every existing caller. It matters because of
+      how it was done (C0-02), not because an extra keyword is inherently wrong.
+  - id: C0-02
+    severity: blocking
+    file: scripts/swarm/check_assets.py
+    line: 25
+    problem: >
+      REF and SOURCE_FILES bound as default argument values, so they resolve at
+      definition time. Module-level overrides are silently ignored.
+    failure_scenario: >
+      Any code that configured this module the documented way — assigning
+      check_assets.REF — now runs against the micro:bit pattern and reports a clean
+      PASS on a course whose assets it never looked for.
+    required_fix: resolve discovery settings at call time, not at definition time.
+  - id: C0-03
+    severity: blocking
+    file: scripts/swarm/check_assets.py
+    line: 75
+    problem: >
+      main(argv) still calls the one-argument form, so the CLI is not generalised.
+      The lane's entire objective is unreachable from its entry point.
+    failure_scenario: >
+      A course using deck.md and shot-* prefixes is audited by
+      `python scripts/swarm/check_assets.py <bundle>`, finds zero references, and
+      exits PASS while every asset is missing. A green gate on an empty check.
+    required_fix: >
+      Resolve discovery from the course manifest so the CLI works for another course
+      without editing this file.
+  - id: C0-04
+    severity: blocking
+    file: tests/test_check_assets.py
+    line: 54
+    problem: >
+      The cross-course test exercises the newly invented keyword API, so it validates
+      the API rather than the requirement, and cannot detect C0-03.
+    required_fix: test through main(argv) — the real CLI path — against a differently-named course.
+  - id: C0-05
+    severity: advisory
+    file: tests/test_check_assets.py
+    line: 45
+    problem: >
+      Missing boundary cases: empty bundle, missing assets dir, missing source file,
+      unicode and case sensitivity, backticked code spans that look like assets, and a
+      source path escaping the bundle (../outside.md).
+    required_fix: add them, and decide-and-document whether bundle containment is enforced here.
+
+builder_defence_recorded_by_claude: >
+  Part of C0-03 traces to the brief, not to the builder. The original lane brief
+  explicitly forbade importing a config module, because lane B had not landed yet, and
+  offered no other channel by which the CLI could learn a course's discovery settings.
+  Within that constraint the CLI could not have been generalised. Lane B has since been
+  APPROVED, so the constraint is lifted and the fix iteration has a real channel.
+  The builder also stayed inside its file scope, kept the diff minimal, and correctly
+  reported that concurrent edits from other lanes were not its own.
+
+graduation_note: >
+  Reviewer's verdict was NOT YET. Claude defers the graduation decision to the next
+  iteration rather than settling it now: three of the four blocking findings stem from
+  one root cause (definition-time binding), and one of those was partly forced by a
+  defective brief. Whether opencode graduates should be judged on how it handles a
+  brief that is not defective. The plan's rule stands either way — no shared
+  infrastructure, git surgery, or executor/overlay work until a lane is APPROVED.
+
+next: opencode fix iteration dispatched with the config channel open

@@ -1,0 +1,133 @@
+step: D
+builder: claude
+reviewer: codex
+date: 2026-08-22
+iteration: 1
+verdict: BLOCKED
+blocking: 16
+advisory: 2
+status_after_fixes: awaiting re-review
+
+# Codex reviewed under -s read-only and could not run tests. The reviewer's two
+# central file:line claims were independently verified by the builder before any
+# fix was made — both were correct.
+
+verified_by_builder:
+  - claim: "gates/cite_filter.py does not exist; the real path is scripts/swarm/gates/cite_filter.py"
+    result: CONFIRMED
+    evidence: "find . -name cite_filter.py -> ./scripts/swarm/gates/cite_filter.py"
+  - claim: "blueprint.md:126 is ambiguous — the template's line 126 is an owner-approval gate row, not the verification rule"
+    result: CONFIRMED
+    evidence: >
+      75-bundle/_TEMPLATE-blueprint.md:126 reads "| D1 | Owner approval is explicit..."
+      while 75-bundle/L1-s1/blueprint.md:126 carries the seeded-bug verification warning.
+      The citation would have sent a future specialist to the wrong rule.
+
+fixes_applied:
+  - finding: 1
+    action: >
+      Corrected the path to scripts/swarm/gates/cite_filter.py and stated plainly that
+      the gate reads critique JSON issues[].cites and does NOT understand claim cards.
+      The skill no longer claims this rule is enforced.
+  - finding: 2
+    action: >
+      Citation now points at 75-bundle/_TEMPLATE-debugging-lab.md Rule 6, with the
+      L1-s1 origin named. The same bad citation was also present in the lane-A file
+      _TEMPLATE-debugging-lab.md:91 and was fixed there too.
+  - finding: 3
+    action: >
+      The deviation from the generator architecture is now a RECORDED amendment in
+      plan section 4 with its rationale, referenced from the agent file, rather than a
+      silent override. Codex was right that quietly dropping a spec item is not a
+      builder's call. opencode consumption of the file is marked UNVERIFIED.
+  - finding: 4
+    action: source_entry now requires applicability (hardware/software/firmware) and confidence.
+  - finding: 5
+    action: >
+      knowledge/ev3/intake-schema.yaml declared canonical. Skill and agent both now
+      carry status, applicability and confidence and state that the schema wins on
+      disagreement.
+  - findings: [6, 7]
+    action: >
+      Accepted as correct and answered with honesty rather than machinery. The schema
+      now carries an enforcement_status block saying every rule except YAML parsing is
+      NOT_ENFORCED, and the skill gained section 9, a per-rule enforced/not-enforced
+      table. Building the validators is now lane H in the plan. Rationale for not
+      building them inside lane D is in unresolved below.
+  - finding: 8
+    action: >
+      Added approval_record with enumerated owner_business_categories, required
+      council_evidence, and a validation rule that specialist == reviewer is invalid
+      regardless of verdict.
+  - finding: 9
+    action: >
+      Software-environment routing rewritten. Sourcing, compatibility analysis and a
+      council recommendation must happen first; only a residual commercial or
+      strategic choice may reach owner_business. This was the finding closest to the
+      owner rule and the reviewer was right to raise it.
+  - finding: 10
+    action: >
+      Added a session-level debugging_lab schema with 9 validation rules covering the
+      ladder, rung uniqueness, escalation order, symptom-not-fault, student/trainer
+      separation, identical predict prompt, and the four trainer-side parts.
+  - finding: 11
+    action: >
+      Added observation_receipt requiring a resolvable PHYSICAL_EVIDENCE asset, media
+      path and hash, observed symptom, date, observer, environment, and an explicit
+      rule that a mismatched symptom is a FAIL, not a pass with a note.
+  - finding: 12
+    action: >
+      Procedural sequences are now validated as a collection (procedural_sequence)
+      with unique contiguous 1..N indices, N-1 transitions, one declared direction,
+      hash resolution and provenance — not per-asset self-reports.
+  - finding: 13
+    action: >
+      Replaced the free-text shot_request with three typed kinds — photograph,
+      transcribe_label, count — each with narrowly permitted fields, plus an explicit
+      ban on any free-text question outside those kinds.
+  - finding: 14
+    action: >
+      Added section 8 to the skill requiring independent reviewer and refuter with
+      distinct actors, and review_receipt to the schema. Marked NOT_ENFORCED.
+  - finding: 15
+    action: added localisation_provenance with an authored_by field; marked NOT_ENFORCED.
+  - finding: 16
+    action: >
+      The EV3 seeded-bug passage is now fenced as a format illustration derived from
+      the plan, explicitly NEEDS_SOURCING, with the fault examples marked as
+      placeholder shapes that have been checked against neither a source nor a kit.
+  - finding: 17
+    action: >
+      known_unknowns kept in place but flagged known_unknowns_are_claims: false, with
+      a note that they record holes rather than assert facts, and a move target once
+      the file has company.
+  - finding: 18
+    action: >
+      Reviewer confirmed the three brand-and-output.md citations are accurate. Left as
+      they are; the connection to validators is lane H.
+
+unresolved:
+  - id: D-H
+    what: >
+      Findings 6, 7, 10-15 all ultimately require validators that do not exist. Lane D
+      shipped the schemas and the honest NOT_ENFORCED labelling; it did not build the
+      gates.
+    why: >
+      Building nine validators is not lane D's declared scope (three files), and
+      validating a schema that nothing produces yet is premature — no EV3 content has
+      been delivered. The real risk the reviewer identified was doctrine CLAIMING
+      enforcement it lacks, and that is fixed: every unenforced rule now says so in
+      both files. Lane H is opened in the plan and gated on content arrival.
+    route: specialist_council
+  - id: D-OC
+    what: opencode has not been tested against .claude/agents/ev3-specialist.md.
+    why: opencode is mid-flight on lane C0. Marked UNVERIFIED in the agent file itself.
+    route: specialist_council
+
+reviewer_quality_note: >
+  This was a strong review. Findings 2, 9 and 13 in particular are defects the builder
+  would not have found alone, and finding 3 correctly called out a spec deviation the
+  builder had made deliberately but recorded only as a code comment. Several findings
+  (6, 7, 10-15) demanded implementation well beyond the lane's file scope; those were
+  answered by removing the false enforcement claims and opening lane H rather than by
+  silently widening scope.

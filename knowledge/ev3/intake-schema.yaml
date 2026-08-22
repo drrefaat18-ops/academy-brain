@@ -1,0 +1,350 @@
+# knowledge/ev3/intake-schema.yaml
+#
+# The shape every EV3 fact must take before it is allowed into the pipeline.
+# Owned by lane D. Consumed by .claude/agents/ev3-specialist.md and by
+# scripts/swarm/gates/cite_filter.py -- see the enforcement_status block below;
+# that gate does NOT currently understand claim cards.
+#
+# This file is a SCHEMA, not data. It contains no EV3 facts, because no EV3
+# course content has been delivered yet (confirmed 2026-08-22). Every example
+# below is marked as an example and must never be read as a sourced claim.
+
+version: 1
+status: awaiting_content          # flips to `active` when EV3 material arrives
+
+# HONEST STATUS, recorded after adversarial review 2026-08-22.
+# This file DESCRIBES the required shapes. It does not ENFORCE them: `required`,
+# `forbidden` and `required_when_*` are prose maps, not schema language, and no
+# validator consumes this file today. A malformed record will parse fine.
+# Converting this to a real schema plus a validator is lane H in
+# docs/PLAN-academy-template-and-ev3.md. Until H lands, treat every rule here as a
+# discipline being followed by hand, and never report it as a check that passed.
+enforcement_status:
+  parses_as_yaml: enforced
+  every_other_rule_in_this_file: NOT_ENFORCED
+  tracked_as: "lane H"
+
+
+# ---------------------------------------------------------------------------
+# 1. Vocabulary — the only permitted status values
+# ---------------------------------------------------------------------------
+
+status_values:
+  SOURCED:          "Tier-1 or tier-2 source with an exact locator. Usable."
+  NEEDS_SOURCING:   "Plausible but unsourced. Nobody may build on it."
+  UNVERIFIED:       "Sourced, but applicability to our kit/firmware unconfirmed, OR a physical-outcome claim with no observation receipt."
+  REFUTED:          "A source contradicts it. Routed to 55-refuted/."
+
+confidence_values: [high, medium, low]
+
+source_tiers:
+  1: "Official manufacturer material. May establish a fact."
+  2: "Academy observation of our physical kit. Authoritative for applicability only."
+  3: "Third party. Supplementary. Never sole support for a safety or hardware claim."
+
+# ---------------------------------------------------------------------------
+# 2. source-catalog.yaml — one entry per source (owned by lane F1)
+# ---------------------------------------------------------------------------
+
+source_entry:
+  required:
+    source_id:      "stable key, kebab-case, referenced by claims"
+    tier:           "1 | 2 | 3"
+    title:          "human-readable"
+    origin:         "URL, or a repo-relative file path for local material"
+    retrieved_on:   "ISO date the material was actually obtained"
+  required_by_tier:
+    tier_1:
+      version_or_date: "document version, edition, or publication date"
+      license:         "licence or terms of use; 'unknown' is a blocker, not a value"
+    tier_2:
+      observed_by:  "who physically looked"
+      observed_on:  "ISO date"
+      media:        "path(s) to the photographs backing the observation"
+    tier_3:
+      provenance_review: "who reviewed it, on what date, and what they concluded"
+    applicability:
+      hardware: "which EV3 kit(s)/part numbers this source covers. 'unknown' is a value that forces UNVERIFIED downstream."
+      software: "which programming environment and version(s) it covers, same rule"
+      firmware: "which brick firmware version(s) it covers, same rule"
+    confidence: "one of confidence_values — how much this source can carry on its own"
+  optional:
+    notes: "free text; never a substitute for a locator"
+
+# ---------------------------------------------------------------------------
+# 3. Claim card — the unit of technical output
+# ---------------------------------------------------------------------------
+
+claim_card:
+  required:
+    claim:         "ONE checkable statement. Not a paragraph, not a recommendation."
+    status:        "one of status_values"
+    applicability: "which kit / firmware / software version this holds for"
+    confidence:    "one of confidence_values"
+  required_when_sourced:
+    source_id: "must resolve in source-catalog.yaml"
+    locator:   "page, section, timestamp, or part number. 'see docs' is not a locator."
+  forbidden:
+    - "a claim whose only support is model knowledge"
+    - "a claim that infers a part, port, block, limit, compatibility, or behaviour"
+    - "a claim established by a generated diagram"
+  example:                      # EXAMPLE ONLY — not a real claim
+    claim: "<statement about EV3 hardware or software>"
+    status: NEEDS_SOURCING
+    source_id: null
+    locator: null
+    applicability: "<kit / firmware this would apply to>"
+    confidence: low
+
+# ---------------------------------------------------------------------------
+# 4. Asset record
+# ---------------------------------------------------------------------------
+
+asset_classes:
+  REFERENCE:          "illustrative; renderer may redraw"
+  EVIDENCE:           "exact; never redraw"
+  PHYSICAL_EVIDENCE:  "academy-captured hardware proof; never redraw, never substitute"
+  PROCEDURAL_SEQUENCE: "ordered build steps; order and continuity are gated"
+
+asset_record:
+  required:
+    asset_id: "stable key"
+    class:    "one of asset_classes"
+    path:     "repo-relative"
+    sha256:   "content hash"
+    source_id: "provenance; for PHYSICAL_EVIDENCE this is the tier-2 observation"
+  required_when_procedural_sequence:
+    sequence_id: "the sequence this step belongs to — steps are validated as a collection, never alone"
+    step_index:  "1-based position, unique within sequence_id"
+  required_when_physical_evidence:
+    request_id:  "the physical_request this fulfils"
+    captured_on: "ISO date"
+    captured_by: "who physically captured it"
+
+# A sequence is validated as a whole. A per-step self-report cannot detect a
+# duplicated or missing step, which is exactly the OCR blind spot this guards.
+procedural_sequence:
+  required:
+    sequence_id: "stable key"
+    step_total:  "N"
+    direction:   "one declared reading direction for the whole sequence"
+    steps:       "the asset_records carrying this sequence_id"
+  validation:                 # all must hold; any failure fails the sequence
+    - "step_index values are exactly 1..N, each appearing once — no gaps, no duplicates"
+    - "the number of steps equals step_total"
+    - "transitions between steps number exactly N-1"
+    - "every transition follows the single declared direction"
+    - "every step asset resolves on disk and its sha256 matches"
+    - "every step carries source/licence provenance"
+  note: >
+    N steps imply N-1 arrows, one direction. This is the documented OCR blind
+    spot. It is not detectable by reading the text of any single step.
+
+# 11 — evidence that a seeded bug reproduces its symptom must be a real record,
+# not a free-text id that nothing resolves.
+observation_receipt:
+  required:
+    receipt_id:       "stable key"
+    asset_id:         "must resolve to an asset_record whose class is PHYSICAL_EVIDENCE"
+    media_path:       "repo-relative path to the captured media"
+    sha256:           "hash of that media"
+    observed_symptom: "what was actually observed, in the same words as the bug's symptom field"
+    observed_on:      "ISO date"
+    observed_by:      "who ran it and watched"
+    environment:      "kit, firmware and software version the observation was made on"
+    verdict:          "PASS only if observed_symptom matches the bug's stated symptom; otherwise FAIL"
+  forbidden:
+    - "a generated or redrawn image"
+    - "media that does not resolve, or whose hash does not match"
+    - "a receipt whose observed_symptom differs from the bug's stated symptom (that is a FAIL, not a pass with a note)"
+
+# ---------------------------------------------------------------------------
+# 5. Shot list — what the specialist may ask a person for
+# ---------------------------------------------------------------------------
+#
+# The specialist never photographs anything. It writes this; a person shoots it;
+# agents crop, label, map, validate and place the result.
+#
+# A shot list may request only physical acts: point a camera, read a label,
+# count items. It may NEVER request a robotics judgment, an opinion on whether
+# something is correct, or a decision about content.
+
+physical_request_kinds: [photograph, transcribe_label, count]
+
+physical_request:
+  required_always:
+    request_id: "stable key"
+    kind:       "one of physical_request_kinds"
+    target:     "the physical object, named so a non-expert can find it without judging it"
+  required_when_photograph:
+    angle:           "how to point the camera"
+    state:           "what condition the object is in (assembled, cable in the left socket, etc.)"
+    background:      "plain / on-mat / as-is"
+    scale_reference: "an object of known size in frame, or 'none required'"
+    filename:        "exactly what to name the file"
+  required_when_transcribe_label:
+    label_location: "where on the object the label is"
+    instruction:    "copy the text exactly as printed, including punctuation; do not interpret it"
+  required_when_count:
+    unit:        "what one counted item is, described physically"
+    instruction: "count items matching that physical description; do not judge whether they are correct or complete"
+  forbidden:
+    - "any request phrased as a question about correctness"
+    - "any request requiring the person to identify a part by function"
+    - "any request requiring the person to decide whether something is right, suitable, or safe"
+    - "any free-text question not covered by the three kinds above"
+
+# ---------------------------------------------------------------------------
+# 6. Seeded bug record
+# ---------------------------------------------------------------------------
+#
+# Follows 75-bundle/_TEMPLATE-debugging-lab.md. Bugs are stated as observed
+# symptoms, never as named faults.
+
+seeded_bug:
+  required:
+    bug_id:  "stable key"
+    kind:    "code | physical"
+    rung:    "lifecycle | content | scope"
+    symptom: "what the student OBSERVES. Naming the fault here is a schema violation."
+    fault:   "the actual defect. TRAINER-FACING ONLY. Never rendered to a student slide."
+    fix:     "what the student changes"
+    verification:
+      status:     "UNVERIFIED until proven"
+      receipt_id: "must resolve to an observation_receipt whose verdict is PASS"
+  required_when_physical:
+    safety_source_id: "source establishing this fault is safe and reversible for an 8-to-10-year-old"
+    reversible: "true | false — false is not shippable"
+  gate: >
+    A seeded bug with verification.status != PASS cannot ship. An unverified
+    seeded bug makes children fake debugging evidence.
+
+# A ladder is not a bag of bugs. The individual record shape above cannot detect
+# three duplicate bugs, a missing rung, or a lab with no trainer side — so the
+# session-level unit is validated too. Source: 75-bundle/_TEMPLATE-debugging-lab.md.
+debugging_lab:
+  required:
+    session_id: "which session this lab belongs to"
+    bugs:       "the seeded_bug records for this session"
+    predict_prompt: "the predict-first prompt, worded identically on every bug slide"
+    mascot_pose:    "the thinking pose, bound to intro and every bug slide"
+    trainer_side:
+      questions_bank:      "one open question per session concept, including one debugging question phrased as a symptom"
+      seeded_bug_table:    "# | seeded program | what they see | fix"
+      problem_response_table: "seeded bugs AND environmental failures (wrong cable, not flashed, weak power, device not mounting)"
+      debugging_routine:   "ordered checklist, cheapest check first"
+    timeline_block: "the lab occupies its own contiguous block in the session timeline"
+  validation:
+    - "at least 3 bugs"
+    - "every rung (lifecycle, content, scope) appears at least once"
+    - "no two bugs share a rung unless the lab has more than 3 bugs, and never the same failure mode twice"
+    - "bugs are ordered by escalating severity: partial success, then wrong output, then total failure"
+    - "every bug's symptom field names an observation, never a construct — a fault name here fails the lab"
+    - "the fault field appears in trainer material only, never in student-facing output"
+    - "predict_prompt is identical across bug slides, except where the symptom class demands it (absence vs wrongness)"
+    - "every bug's verification.receipt_id resolves to a PASS observation_receipt"
+    - "all four trainer_side parts are present and non-empty"
+
+# ---------------------------------------------------------------------------
+# 7. Known unknowns — recorded holes, not hidden ones
+# ---------------------------------------------------------------------------
+
+known_unknown:
+  required:
+    id:            "stable key"
+    question:      "what is not known"
+    blocks:        "what cannot proceed until it is settled"
+    would_settle_it: "the specific source or observation that would close it"
+    routed_to:     "specialist_council | owner_business | physical_action_required"
+
+# Standing entries. These are NOT sourced EV3 claims and assert nothing about EV3.
+# Each records a hole and how to close it, which is the opposite of a claim. They
+# live here rather than in a data file because they are true before any content
+# exists; move them to knowledge/ev3/known-unknowns.yaml once that file has company.
+known_unknowns_are_claims: false
+known_unknowns:
+  - id: ev3-physical-bug-safety
+    question: "Which physical EV3 faults are safe and reversible for an 8-to-10-year-old to induce and undo?"
+    blocks: "every physical seeded bug in every session"
+    would_settle_it: "tier-1 manufacturer safety guidance, or an academy trainer observation receipt"
+    routed_to: specialist_council
+
+  - id: ev3-academy-kit-identity
+    question: "Which EV3 kit(s) does the academy physically own, and how many?"
+    blocks: "all applicability checks; any claim that depends on a specific part"
+    would_settle_it: "label text, quantities, and photographs of identifying labels"
+    routed_to: physical_action_required
+
+  - id: ev3-software-environment
+    question: "Which EV3 programming environment and version will be used?"
+    blocks: "all code bugs, all block references, the build/program/test sequence"
+    would_settle_it: >
+      the delivered EV3 course content. If it does not specify, the specialist council
+      sources the available environments, analyses compatibility against the academy
+      kit, and RECOMMENDS one. This is agent work and must be completed first. It
+      reaches owner_business only if a genuinely non-technical commercial or strategic
+      choice remains after that — a licence cost, a vendor relationship — never the
+      technical question of which environment is suitable.
+    routed_to: specialist_council
+
+# ---------------------------------------------------------------------------
+# 7b. Typed approval, independent review, and localisation provenance
+# ---------------------------------------------------------------------------
+
+approval_kinds:
+  specialist_council: "DEFAULT. Any technical or content decision. Requires council_evidence."
+  owner_business:     "Restricted to the enumerated categories below. Nothing else qualifies."
+  physical_action_required: "A literal physical act, expressed as a physical_request."
+
+owner_business_categories: [pricing, schedule, purchase, licensing_exception, vendor_relationship]
+
+approval_record:
+  required:
+    kind:    "one of approval_kinds"
+    subject: "what is being approved"
+  required_when_specialist_council:
+    council_evidence:
+      specialist: "actor name"
+      reviewer:   "actor name — MUST differ from specialist"
+      refuter:    "actor name — required for high-severity calls; MUST differ from both"
+  required_when_owner_business:
+    category:  "must be one of owner_business_categories"
+    why_not_technical: "one sentence establishing no amount of sourcing or analysis could settle it"
+  validation:
+    - "kind: owner_business with a category outside the enumerated list is invalid"
+    - "kind: specialist_council with specialist == reviewer is invalid regardless of verdict"
+    - "a high-severity call with no refuter is invalid"
+
+review_receipt:
+  required:
+    subject_id: "what was reviewed"
+    actor:      "who reviewed — must differ from the producer"
+    role:       "reviewer | refuter"
+    inputs:     "what was actually read"
+    verdict:    "APPROVED | BLOCKED"
+    citations:  "the source_ids checked"
+    severity_covered: "which severities this pass covered; high-severity requires a refuter pass"
+
+# 15 — nothing today records who wrote localized text, so the non-Claude Arabic
+# rule (00-contracts/rubric.md:59-66) cannot be checked at all.
+localisation_provenance:
+  required:
+    artifact_path: "the file carrying localized text"
+    language:      "e.g. ar"
+    authored_by:   "the lane/provider that wrote it"
+  validation:
+    - "Arabic text attributed to any non-Claude lane is rejected"
+  status: NOT_ENFORCED   # no field is populated today; lane H
+
+# ---------------------------------------------------------------------------
+# 8. Routing rule — repeated here because it is the one that gets broken
+# ---------------------------------------------------------------------------
+
+routing:
+  specialist_council: "DEFAULT. Every technical or content decision, every defect, every QC call, every asset choice."
+  owner_business:     "Genuinely undecidable business judgment only. Pricing, schedule, purchases, licensing exceptions."
+  physical_action_required: "A literal physical act. Read a label, count kit, photograph to a shot list. Never a robotics judgment."
+  rule: >
+    Never route an agent-resolvable defect to the owner. He is a pharmacist. If a
+    decision could be settled by sourcing, reading, or reasoning, it is
+    specialist_council — no matter how tedious.
