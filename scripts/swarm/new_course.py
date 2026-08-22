@@ -26,6 +26,7 @@ import argparse
 import re
 import shutil
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -88,6 +89,47 @@ class Seed:
         if not _SLUG.fullmatch(self.slug):
             raise ScaffoldError(
                 f"slug {self.slug!r} must be lowercase letters, digits and hyphens"
+            )
+        if not isinstance(self.name, str) or not self.name:
+            raise ScaffoldError(f"name {self.name!r} must be a non-empty string")
+        if not self.levels or any(
+            not isinstance(n, int) or isinstance(n, bool) or n <= 0 for n in self.levels
+        ):
+            raise ScaffoldError(
+                f"levels {self.levels!r} must be a non-empty tuple of positive ints"
+            )
+        if (
+            not isinstance(self.sessions_per_level, int)
+            or isinstance(self.sessions_per_level, bool)
+            or self.sessions_per_level <= 0
+        ):
+            raise ScaffoldError(
+                f"sessions_per_level {self.sessions_per_level!r} must be a positive int"
+            )
+        if not self.providers or any(
+            not isinstance(p, str) or not p for p in self.providers
+        ):
+            raise ScaffoldError(
+                f"providers {self.providers!r} must be a non-empty tuple of "
+                "non-empty strings"
+            )
+        if not self.asset_source_files or any(
+            not isinstance(s, str) or not s for s in self.asset_source_files
+        ):
+            raise ScaffoldError(
+                f"asset_source_files {self.asset_source_files!r} must be a "
+                "non-empty tuple of non-empty strings"
+            )
+        try:
+            compiled = re.compile(self.asset_ref_pattern)
+        except re.error as exc:
+            raise ScaffoldError(
+                f"asset_ref_pattern {self.asset_ref_pattern!r} does not compile ({exc})"
+            ) from exc
+        if compiled.groups != 1:
+            raise ScaffoldError(
+                f"asset_ref_pattern {self.asset_ref_pattern!r} must have exactly "
+                f"one capture group (it has {compiled.groups})"
             )
         if len(self.artifact_schedule) != self.sessions_per_level:
             raise ScaffoldError(
@@ -199,29 +241,48 @@ def _copy_scaffold(source: Path, target: Path) -> list[str]:
 
 
 def create(seed: Seed, target: Path, source: Path) -> config.CourseConfig:
-    """Create the course and return the manifest as loaded back from disk."""
+    """Create the course and return the manifest as loaded back from disk.
+
+    Everything is built in a temporary sibling directory first and moved into
+    ``target`` only after the generated manifest loads. A scaffolder that dies
+    halfway through writing the real target leaves a directory that looks like
+    started work, and the next run then refuses the target as non-empty.
+    """
     seed.validate()
     target = Path(target)
+    source = Path(source)
     _check_target(target, source)
 
-    target.mkdir(parents=True, exist_ok=True)
-    for rel in STAGE_DIRS:
-        (target / rel).mkdir(parents=True, exist_ok=True)
-    _copy_scaffold(Path(source), target)
-
-    (target / "course.yaml").write_text(manifest_text(seed), encoding="utf-8")
-
-    # Load it BACK. Writing a manifest and reporting success without reading it
-    # is exactly the shape of defect this vault has rejected five times.
+    target.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f"{target.name}.tmp-", dir=target.parent))
     try:
-        course = config.load_course(target)
-    except config.CourseConfigError as exc:
-        raise ScaffoldError(
-            f"the generated manifest does not load: {exc}. The course directory is "
-            "left in place for inspection; it is not usable."
-        ) from exc
+        for rel in STAGE_DIRS:
+            (staging / rel).mkdir(parents=True, exist_ok=True)
+        _copy_scaffold(source, staging)
 
-    (target / "topology.md").write_text(topology_text(seed, course), encoding="utf-8")
+        (staging / "course.yaml").write_text(manifest_text(seed), encoding="utf-8")
+
+        # Load it BACK. Writing a manifest and reporting success without reading it
+        # is exactly the shape of defect this vault has rejected five times.
+        try:
+            course = config.load_course(staging)
+        except config.CourseConfigError as exc:
+            raise ScaffoldError(
+                f"the generated manifest does not load: {exc}. The staged course "
+                f"was discarded; nothing was written to {target}."
+            ) from exc
+
+        (staging / "topology.md").write_text(topology_text(seed, course), encoding="utf-8")
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+
+    if target.exists():
+        # _check_target already refused anything non-empty, so this can only be
+        # an empty directory sitting exactly on the target path — it holds no
+        # work, and the rename below needs the path free.
+        target.rmdir()
+    staging.rename(target)
     return course
 
 

@@ -398,3 +398,33 @@ def test_a_placement_record_does_not_survive_the_image_it_describes(tmp_path):
     assert overlay.placed_ids(deck) == {"bug-1"}, "the record survives, as it would in the wild"
     with pytest.raises(overlay.OverlayError, match="no longer on page"):
         overlay.assert_filled(deck, {"bug-1": png})
+
+
+def test_a_listed_xref_with_no_placement_rect_is_caught(tmp_path):
+    """C6 follow-up. Redaction-family tools can leave an image xref LISTED in
+    the page's resources while stripping everything that draws it, so resource
+    membership alone proves nothing: only a live placement rect does."""
+    deck = _pdf(tmp_path, "[Reserved Image Area: bug-1]")
+    png = _png(tmp_path)
+    overlay.overlay(deck, {"bug-1": png})
+
+    page_no, xref = overlay.placements(deck)["bug-1"]
+
+    # Produce exactly that state: keep the resource entry, remove every draw
+    # command. (A whole-page add_redact_annot + apply_redactions(
+    # images=fitz.PDF_REDACT_IMAGE_REMOVE) on this PyMuPDF deletes the resource
+    # entry outright — the sibling case the test above already covers.)
+    doc = fitz.open(str(deck))
+    for c in doc[page_no - 1].get_contents():
+        doc.update_stream(c, b" ")
+    doc.saveIncr()
+    doc.close()
+
+    with fitz.open(str(deck)) as proof:
+        assert xref in {x[0] for x in proof[page_no - 1].get_images(full=True)}, (
+            "fixture must leave the xref listed"
+        )
+        assert proof[page_no - 1].get_image_rects(xref) == []
+
+    with pytest.raises(overlay.OverlayError, match="no placement rect"):
+        overlay.assert_filled(deck, {"bug-1": png})

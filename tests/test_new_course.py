@@ -181,12 +181,13 @@ def test_refuses_a_schedule_that_does_not_cover_every_session(tmp_path):
 
 
 def test_an_invalid_pattern_fails_at_creation_not_at_first_audit(tmp_path):
-    """A two-group pattern loads as a config error. The scaffolder must not
-    report success and leave the defect for whoever runs the first asset gate."""
+    """A two-group pattern is refused by Seed.validate() before anything is
+    written. The scaffolder must not report success and leave the defect for
+    whoever runs the first asset gate."""
     seed = new_course.Seed(
         **{**EV3_SEED.__dict__, "asset_ref_pattern": r"`((shot)[^`]+\.png)`"}
     )
-    with pytest.raises(new_course.ScaffoldError, match="does not load"):
+    with pytest.raises(new_course.ScaffoldError, match="exactly one capture group"):
         new_course.create(seed, tmp_path / "c", VAULT)
 
 

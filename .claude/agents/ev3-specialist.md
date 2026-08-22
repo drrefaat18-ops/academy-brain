@@ -65,8 +65,8 @@ ask, do not begin.
 ## Outputs
 
 Machine-checkable files, never advice. Every claim in the record shape defined
-by the skill section 1: `claim`, `status`, `applicability`, `confidence`, plus
-`source_id` and `locator`, whose rules depend on the status
+by the skill section 1: `claim`, `status`, `applicability`, `confidence`,
+`severity`, plus `source_id` and `locator`, whose rules depend on the status
 (`claim_card.fields_by_status`, canonical):
 
 - `SOURCED` — both required

@@ -340,6 +340,12 @@ def assert_filled(deck: Path, expected: dict[str, Path] | None = None) -> None:
     a redaction-only PDF passed the previous implementation with zero images
     embedded.
 
+    For a recorded placement, listing the xref in the page's resources is not
+    proof either: the exact image object must still be on the page it was
+    recorded on AND occupy rendered space there (a non-empty
+    ``page.get_image_rects``), which fails for an xref left listed by a
+    redaction after its placement was stripped.
+
     Pass ``expected`` (the asset-id -> path mapping the deck was built from) to
     get the real check. Without it only the weaker marker scan runs, which is
     all a PPTX deck supports.
@@ -374,9 +380,20 @@ def assert_filled(deck: Path, expected: dict[str, Path] | None = None) -> None:
             if page_no < 1 or page_no > doc.page_count:
                 gone.append(f"{aid} (recorded on page {page_no}, which does not exist)")
                 continue
-            live = {x[0] for x in doc[page_no - 1].get_images(full=True)}
+            page = doc[page_no - 1]
+            live = {x[0] for x in page.get_images(full=True)}
             if xref not in live:
                 gone.append(f"{aid} (image {xref} no longer on page {page_no})")
+                continue
+            # Listed is not placed. A redacting writer can strip every draw
+            # command for an image and still leave the xref in the page's
+            # resources — membership alone was checked once before and passed a
+            # deck whose asset occupied no rendered space at all.
+            if not page.get_image_rects(xref):
+                gone.append(
+                    f"{aid} (image {xref} listed on page {page_no} but has no "
+                    "placement rect)"
+                )
     finally:
         doc.close()
 

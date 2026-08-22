@@ -63,6 +63,7 @@ source_id: <key into knowledge/ev3/source-catalog.yaml — required when SOURCED
 locator: <page / section / timestamp / part number — required when SOURCED>
 applicability: <which kit/firmware/software this holds for>
 confidence: high | medium | low
+severity: high | medium | low
 ```
 
 A `SOURCED` claim without `locator` is not a claim. For every other status the

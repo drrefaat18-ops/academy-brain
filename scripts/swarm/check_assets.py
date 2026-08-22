@@ -280,8 +280,30 @@ def discovery_for(bundle: Path) -> tuple[re.Pattern[str], tuple[str, ...], bool]
     current = Path(bundle).resolve()
     for candidate in (current, *current.parents):
         manifest = candidate / MANIFEST_NAME
-        if not manifest.is_file():
-            continue
+        try:
+            if not manifest.exists():
+                # exists() follows the link, so a BROKEN manifest symlink lands
+                # here looking exactly like an absent manifest — and absent is
+                # how the walk continues upward toward an ancestor course.yaml.
+                # Separate them first, or a bundle under a dangling link audits
+                # under ANOTHER course's naming instead of failing.
+                if manifest.is_symlink():
+                    raise DiscoveryError(
+                        f"{candidate}: {MANIFEST_NAME} is a symlink that resolves "
+                        "to nothing. Refusing to walk past it to another course's "
+                        "manifest."
+                    )
+                continue
+            if not manifest.is_file():
+                raise DiscoveryError(
+                    f"{candidate}: {MANIFEST_NAME} exists but is not a regular "
+                    "file. Refusing to walk past it to another course's manifest."
+                )
+        except OSError as exc:
+            raise DiscoveryError(
+                f"{candidate}: {MANIFEST_NAME} could not be inspected ({exc}) — "
+                "refusing to walk past it"
+            ) from exc
         # A manifest symlinked in from outside the candidate directory would let
         # another course's naming (or expect_references: false) govern this
         # bundle — the same escape _refs() already closes for source files.
