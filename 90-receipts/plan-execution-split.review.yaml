@@ -1,0 +1,221 @@
+---
+step: plan-execution-split
+builder: claude
+reviewer: codex
+date: 2026-08-22
+verdict: BLOCKED
+topics: [work-split, opencode-permissions]
+blocking: 9
+advisory: 2
+---
+
+## Topic 1
+
+verdict: BLOCKED
+
+findings:
+
+1. **blocking — `docs/PLAN-academy-template-and-ev3.md:337-340` — C1, C2, and C3 are assigned to different builders despite all requiring changes to `scripts/swarm/generate_session.py`.** Failure scenario: Codex refactors `generate_session.py` around configuration while Claude independently adds overlays and replaces `enforce_blueprint_gate`; one worktree cannot merge the other without semantic conflict, violating the claimed one-writer rule. Required fix: assign all `generate_session.py` work to one builder, or serialize C1 → C2 → C3 with explicit commit boundaries and rebase/review after each handoff.
+
+2. **blocking — `docs/PLAN-academy-template-and-ev3.md:346-349` — “No two builders touch the same path” is false before execution has even begun.** Failure scenario: C1 owns `generate_session.py`; C2’s overlay must integrate into its planning/live-run/receipt flow; C3 explicitly replaces `enforce_blueprint_gate` at `scripts/swarm/generate_session.py:161`, so three lanes collide on the same file. Required fix: publish an authoritative per-file ownership matrix, not work descriptions, and reject any lane whose necessary files intersect.
+
+3. **blocking — `docs/PLAN-academy-template-and-ev3.md:432-433` — the dependency statement treats all of C as one gate even though C4 is independent of B and D does not depend on most of C.** Failure scenario: documentation cleanup in C4 waits unnecessarily for the configuration refactor, while D’s skill and intake-schema work is also stalled behind overlay implementation that it does not consume. Required fix: express dependencies per substep: A → B → C1; C1 → C2/C3 where they share executor behavior; C4 may start after A; B → D-definition; D plus the completed template/scaffolder → E; F → G.
+
+4. **blocking — `docs/PLAN-academy-template-and-ev3.md:338-339` — C2 and C3 are incorrectly presented as parallel Claude lanes although they share both a file and behavior.** Failure scenario: C2 builds overlay preflight around the current binary blueprint approval, then C3 changes that approval model and invalidates C2’s assumptions or tests. Required fix: combine them into one Claude executor lane or explicitly serialize C3 before C2 with shared integration tests.
+
+5. **blocking — `docs/PLAN-academy-template-and-ev3.md:314-317,341-344` — F has no executable builder, so the A–G assignment cannot produce G.** Failure scenario: the template and specialist exist, but EV3 facts and physical kit inventory remain unavailable; the pilot either stops or invents technical content contrary to the plan. Required fix: split F into agent-resolvable manufacturer sourcing with an assigned builder and a narrowly defined `physical_action_required` inventory step that may legitimately reach the owner.
+
+6. **advisory — `docs/PLAN-academy-template-and-ev3.md:342` — E’s grep-only proof is too weak for a course instantiation lane.** Failure scenario: generated files contain no literal “micro:bit” or “makecode” but retain hard-coded session counts, Arabic-only rendering, old bundle filenames, absolute paths, or stale provider topology. Required fix: make E run `new_course.py`, configuration/schema validation, imports, self-checks, pytest, path-containment tests, and semantic fixture assertions in addition to the grep.
+
+7. **blocking — `scripts/swarm/generate_session.py:37-39,519` — B genuinely gates the executor portion of C1 because `generate_session.py` imports `paths`, aliases `VAULT_ROOT`, and calls `validate_session_id`.** Failure scenario: C1 starts against the old import-time constants while B changes their API to `CourseConfig`, producing either broken imports or a compatibility shim that preserves the coupling B was meant to remove. Required fix: approve B’s public configuration/path API before C1 begins, and include consumer-contract tests.
+
+8. **advisory — `scripts/swarm/check_assets.py:18-19` — the `check_assets.py` portion of C1 does not inherently depend on B and can be parallelized if its eventual configuration interface is specified first.** Failure scenario: the entire C1 lane waits for B even though replacing the filename regex and source-file tuple can be developed and tested independently. Required fix: separate asset-discovery behavior from configuration wiring; develop the former in parallel, then integrate after B.
+
+9. **blocking — `docs/PLAN-academy-template-and-ev3.md:373,388-392` — Claude reviewing Codex is not an independent challenge to the plan’s assumptions because Claude co-authored the requirements and owns integration.** Failure scenario: Codex faithfully implements a mistaken manifest model; Claude approves it because it matches the shared plan, while tests also encode that model. Required fix: use OpenCode as the blind requirements reviewer once shell access is constrained, or give Claude a requirements-inversion checklist authored independently by Codex/OpenCode; reserve Claude for integration review, not sole acceptance of Codex lanes.
+
+10. **blocking — `docs/PLAN-academy-template-and-ev3.md:357-365` — the loop structurally cannot detect a shared specification error encoded consistently in implementation, tests, and reviewer expectations.** Failure scenario: `course.yaml`, `paths.py`, tests, and both reviewers agree that every session produces artifacts, silently recreating the s8 defect under a new schema; all three rungs pass because the owner is excluded and no independent oracle tests no-artifact sessions. Required fix: add contract-derived acceptance fixtures and mutation/negative tests written independently of the builder, including no-artifact sessions, unknown asset names, external paths, and alternate renderer/language configurations.
+
+11. **blocking — `docs/PLAN-academy-template-and-ev3.md:423` — re-reviewing only the fix and its blast radius permits cumulative defects outside the reviewer’s predicted blast radius.** Failure scenario: a fix to configuration loading changes import-time root resolution, but the reviewer examines only the reported failing test and misses another script now targeting the wrong vault. Required fix: rerun the complete non-waivable suite on every iteration and require a full-lane adversarial review after the final fix, not only a local delta review.
+
+## Topic 2
+
+verdict: BLOCKED
+
+findings:
+
+1. **blocking — `00-contracts/agent-memory.md:73-89` — the previous “sandbox blocked shell calls” diagnosis is disproven as a general capability claim but not conclusively replaced as the historical root cause.** Failure scenario: `--auto` succeeds today while the original run actually failed because of a different OpenCode version, agent-level permission override, external-directory prompt, command safety classification, working directory, timeout, or model/tool-call behavior. Required fix: retain the original stderr/session log and reproduce the original command once without `--auto`, then once with it, holding version, model, agent, cwd, and prompt constant; record the exact permission request.
+
+2. **advisory — `00-contracts/agent-memory.md:73-89` — the successful `echo`/`python --version` test proves only that benign shell execution works under auto-approval.** Failure scenario: a real lane still fails when it invokes pytest, writes files, accesses another worktree, launches a subprocess, or triggers `external_directory`. Required fix: test the actual lane command in a disposable worktree with the intended permission configuration and capture each resolved permission.
+
+3. **blocking — `docs/PLAN-academy-template-and-ev3.md:346` — an isolated git worktree does not contain the process or its credentials.** Failure scenario: an auto-approved shell command modifies the main repository through an absolute path, runs `git -C` against another worktree, edits global Git/OpenCode configuration, reads SSH/API credentials, pushes commits, accesses network services, kills processes, writes scheduled tasks, or deletes files elsewhere on the drive. Required fix: treat a worktree as merge isolation only; combine deny-by-default shell permissions with OS-level filesystem/process/network isolation and least-privilege credentials.
+
+4. **blocking — OpenCode config schema `PermissionConfig`, `docs/PLAN-academy-template-and-ev3.md:329-340` — command denylisting cannot safely implement “all builds/tests allowed, destructive operations denied.”** Failure scenario: `python`, `pytest`, `npm test`, or a project build script can itself delete external files, run PowerShell, exfiltrate secrets, or invoke Git; the permission layer sees the allowed parent command. Required fix: allow only exact repository commands whose scripts have been reviewed, deny external directories and network tools, and execute the lane inside an OS sandbox. Do not use `--auto` as the security boundary.
+
+5. **blocking — OpenCode schema `config.json:84-166,1180-1182` — the verified conservative configuration should use `permission`, `bash`, and last-match-wins command patterns as follows.** Failure scenario: a broad `"bash": "allow"` or catch-all allow placed last overrides destructive denies. Required fix: use a deny-by-default allowlist such as:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "*": "deny",
+
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow"
+    },
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "lsp": "allow",
+
+    "edit": "allow",
+
+    "bash": {
+      "*": "deny",
+
+      "git status": "allow",
+      "git status *": "allow",
+      "git diff": "allow",
+      "git diff *": "allow",
+      "git log": "allow",
+      "git log *": "allow",
+
+      "python --version": "allow",
+      "python -m pytest": "allow",
+      "python -m pytest *": "allow",
+      "pytest": "allow",
+      "pytest *": "allow",
+
+      "python scripts/swarm/check_assets.py --self-check": "allow",
+      "python scripts/swarm/generate_session.py --self-check": "allow"
+    },
+
+    "external_directory": "deny",
+    "task": "deny",
+    "webfetch": "deny",
+    "websearch": "deny",
+    "question": "deny"
+  }
+}
+```
+
+The field names and object syntax are verified against the live [OpenCode schema](https://opencode.ai/config.json) and [official permission documentation](https://opencode.ai/docs/permissions/). This permits source edits, so it cannot prevent destructive edits inside the worktree; Git/worktree recovery remains necessary.
+
+6. **advisory — `docs/PLAN-academy-template-and-ev3.md:330-340` — OpenCode should no longer be restricted to text-only work solely because shell approval was unavailable.** Failure scenario: Codex and Claude remain overloaded while a now-capable third builder is artificially idle, increasing collisions such as C1/C2/C3. Required fix: give OpenCode a bounded code lane with disjoint files, exact tests, a deny-by-default permission profile, and mandatory Codex review—for example the standalone `check_assets.py` generalization after its configuration interface is frozen.
+
+7. **blocking — `00-contracts/agent-memory.md:73-89` — the strongest argument against assigning OpenCode critical code lanes is not shell access but insufficient evidence of reliable autonomous implementation under real lane conditions.** Failure scenario: the free preview model passes a trivial shell probe but wanders, times out, misunderstands cross-file invariants, or produces an unreviewable partial diff during a large executor refactor. Required fix: graduate it through a small reversible code lane with an objective oracle before assigning shared infrastructure, Git surgery, security-sensitive permissions, or the executor/overlay path.
+
+## What I could not verify
+
+- I could not identify the exact historical OpenCode failure because the original command, stderr, OpenCode version, cwd, active agent configuration, and permission prompt were not present in the reviewed files.
+- I could not verify that the proposed allowed pytest/self-check commands are side-effect-free; an allowed interpreter or test runner can execute arbitrary repository code.
+- I could not verify OS-level containment around the OpenCode process. A git worktree alone provides none.
+- I could not verify the eventual `course.yaml`, `config.py`, `new_course.py`, overlay API, or EV3 specialist implementation because they are planned rather than present.
+- I could not verify EV3 factual correctness or academy kit inventory because step F explicitly lacks its source material.
+tokens used
+## Topic 1
+
+verdict: BLOCKED
+
+findings:
+
+1. **blocking — `docs/PLAN-academy-template-and-ev3.md:337-340` — C1, C2, and C3 are assigned to different builders despite all requiring changes to `scripts/swarm/generate_session.py`.** Failure scenario: Codex refactors `generate_session.py` around configuration while Claude independently adds overlays and replaces `enforce_blueprint_gate`; one worktree cannot merge the other without semantic conflict, violating the claimed one-writer rule. Required fix: assign all `generate_session.py` work to one builder, or serialize C1 → C2 → C3 with explicit commit boundaries and rebase/review after each handoff.
+
+2. **blocking — `docs/PLAN-academy-template-and-ev3.md:346-349` — “No two builders touch the same path” is false before execution has even begun.** Failure scenario: C1 owns `generate_session.py`; C2’s overlay must integrate into its planning/live-run/receipt flow; C3 explicitly replaces `enforce_blueprint_gate` at `scripts/swarm/generate_session.py:161`, so three lanes collide on the same file. Required fix: publish an authoritative per-file ownership matrix, not work descriptions, and reject any lane whose necessary files intersect.
+
+3. **blocking — `docs/PLAN-academy-template-and-ev3.md:432-433` — the dependency statement treats all of C as one gate even though C4 is independent of B and D does not depend on most of C.** Failure scenario: documentation cleanup in C4 waits unnecessarily for the configuration refactor, while D’s skill and intake-schema work is also stalled behind overlay implementation that it does not consume. Required fix: express dependencies per substep: A → B → C1; C1 → C2/C3 where they share executor behavior; C4 may start after A; B → D-definition; D plus the completed template/scaffolder → E; F → G.
+
+4. **blocking — `docs/PLAN-academy-template-and-ev3.md:338-339` — C2 and C3 are incorrectly presented as parallel Claude lanes although they share both a file and behavior.** Failure scenario: C2 builds overlay preflight around the current binary blueprint approval, then C3 changes that approval model and invalidates C2’s assumptions or tests. Required fix: combine them into one Claude executor lane or explicitly serialize C3 before C2 with shared integration tests.
+
+5. **blocking — `docs/PLAN-academy-template-and-ev3.md:314-317,341-344` — F has no executable builder, so the A–G assignment cannot produce G.** Failure scenario: the template and specialist exist, but EV3 facts and physical kit inventory remain unavailable; the pilot either stops or invents technical content contrary to the plan. Required fix: split F into agent-resolvable manufacturer sourcing with an assigned builder and a narrowly defined `physical_action_required` inventory step that may legitimately reach the owner.
+
+6. **advisory — `docs/PLAN-academy-template-and-ev3.md:342` — E’s grep-only proof is too weak for a course instantiation lane.** Failure scenario: generated files contain no literal “micro:bit” or “makecode” but retain hard-coded session counts, Arabic-only rendering, old bundle filenames, absolute paths, or stale provider topology. Required fix: make E run `new_course.py`, configuration/schema validation, imports, self-checks, pytest, path-containment tests, and semantic fixture assertions in addition to the grep.
+
+7. **blocking — `scripts/swarm/generate_session.py:37-39,519` — B genuinely gates the executor portion of C1 because `generate_session.py` imports `paths`, aliases `VAULT_ROOT`, and calls `validate_session_id`.** Failure scenario: C1 starts against the old import-time constants while B changes their API to `CourseConfig`, producing either broken imports or a compatibility shim that preserves the coupling B was meant to remove. Required fix: approve B’s public configuration/path API before C1 begins, and include consumer-contract tests.
+
+8. **advisory — `scripts/swarm/check_assets.py:18-19` — the `check_assets.py` portion of C1 does not inherently depend on B and can be parallelized if its eventual configuration interface is specified first.** Failure scenario: the entire C1 lane waits for B even though replacing the filename regex and source-file tuple can be developed and tested independently. Required fix: separate asset-discovery behavior from configuration wiring; develop the former in parallel, then integrate after B.
+
+9. **blocking — `docs/PLAN-academy-template-and-ev3.md:373,388-392` — Claude reviewing Codex is not an independent challenge to the plan’s assumptions because Claude co-authored the requirements and owns integration.** Failure scenario: Codex faithfully implements a mistaken manifest model; Claude approves it because it matches the shared plan, while tests also encode that model. Required fix: use OpenCode as the blind requirements reviewer once shell access is constrained, or give Claude a requirements-inversion checklist authored independently by Codex/OpenCode; reserve Claude for integration review, not sole acceptance of Codex lanes.
+
+10. **blocking — `docs/PLAN-academy-template-and-ev3.md:357-365` — the loop structurally cannot detect a shared specification error encoded consistently in implementation, tests, and reviewer expectations.** Failure scenario: `course.yaml`, `paths.py`, tests, and both reviewers agree that every session produces artifacts, silently recreating the s8 defect under a new schema; all three rungs pass because the owner is excluded and no independent oracle tests no-artifact sessions. Required fix: add contract-derived acceptance fixtures and mutation/negative tests written independently of the builder, including no-artifact sessions, unknown asset names, external paths, and alternate renderer/language configurations.
+
+11. **blocking — `docs/PLAN-academy-template-and-ev3.md:423` — re-reviewing only the fix and its blast radius permits cumulative defects outside the reviewer’s predicted blast radius.** Failure scenario: a fix to configuration loading changes import-time root resolution, but the reviewer examines only the reported failing test and misses another script now targeting the wrong vault. Required fix: rerun the complete non-waivable suite on every iteration and require a full-lane adversarial review after the final fix, not only a local delta review.
+
+## Topic 2
+
+verdict: BLOCKED
+
+findings:
+
+1. **blocking — `00-contracts/agent-memory.md:73-89` — the previous “sandbox blocked shell calls” diagnosis is disproven as a general capability claim but not conclusively replaced as the historical root cause.** Failure scenario: `--auto` succeeds today while the original run actually failed because of a different OpenCode version, agent-level permission override, external-directory prompt, command safety classification, working directory, timeout, or model/tool-call behavior. Required fix: retain the original stderr/session log and reproduce the original command once without `--auto`, then once with it, holding version, model, agent, cwd, and prompt constant; record the exact permission request.
+
+2. **advisory — `00-contracts/agent-memory.md:73-89` — the successful `echo`/`python --version` test proves only that benign shell execution works under auto-approval.** Failure scenario: a real lane still fails when it invokes pytest, writes files, accesses another worktree, launches a subprocess, or triggers `external_directory`. Required fix: test the actual lane command in a disposable worktree with the intended permission configuration and capture each resolved permission.
+
+3. **blocking — `docs/PLAN-academy-template-and-ev3.md:346` — an isolated git worktree does not contain the process or its credentials.** Failure scenario: an auto-approved shell command modifies the main repository through an absolute path, runs `git -C` against another worktree, edits global Git/OpenCode configuration, reads SSH/API credentials, pushes commits, accesses network services, kills processes, writes scheduled tasks, or deletes files elsewhere on the drive. Required fix: treat a worktree as merge isolation only; combine deny-by-default shell permissions with OS-level filesystem/process/network isolation and least-privilege credentials.
+
+4. **blocking — OpenCode config schema `PermissionConfig`, `docs/PLAN-academy-template-and-ev3.md:329-340` — command denylisting cannot safely implement “all builds/tests allowed, destructive operations denied.”** Failure scenario: `python`, `pytest`, `npm test`, or a project build script can itself delete external files, run PowerShell, exfiltrate secrets, or invoke Git; the permission layer sees the allowed parent command. Required fix: allow only exact repository commands whose scripts have been reviewed, deny external directories and network tools, and execute the lane inside an OS sandbox. Do not use `--auto` as the security boundary.
+
+5. **blocking — OpenCode schema `config.json:84-166,1180-1182` — the verified conservative configuration should use `permission`, `bash`, and last-match-wins command patterns as follows.** Failure scenario: a broad `"bash": "allow"` or catch-all allow placed last overrides destructive denies. Required fix: use a deny-by-default allowlist such as:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "*": "deny",
+
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow"
+    },
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "lsp": "allow",
+
+    "edit": "allow",
+
+    "bash": {
+      "*": "deny",
+
+      "git status": "allow",
+      "git status *": "allow",
+      "git diff": "allow",
+      "git diff *": "allow",
+      "git log": "allow",
+      "git log *": "allow",
+
+      "python --version": "allow",
+      "python -m pytest": "allow",
+      "python -m pytest *": "allow",
+      "pytest": "allow",
+      "pytest *": "allow",
+
+      "python scripts/swarm/check_assets.py --self-check": "allow",
+      "python scripts/swarm/generate_session.py --self-check": "allow"
+    },
+
+    "external_directory": "deny",
+    "task": "deny",
+    "webfetch": "deny",
+    "websearch": "deny",
+    "question": "deny"
+  }
+}
+```
+
+The field names and object syntax are verified against the live [OpenCode schema](https://opencode.ai/config.json) and [official permission documentation](https://opencode.ai/docs/permissions/). This permits source edits, so it cannot prevent destructive edits inside the worktree; Git/worktree recovery remains necessary.
+
+6. **advisory — `docs/PLAN-academy-template-and-ev3.md:330-340` — OpenCode should no longer be restricted to text-only work solely because shell approval was unavailable.** Failure scenario: Codex and Claude remain overloaded while a now-capable third builder is artificially idle, increasing collisions such as C1/C2/C3. Required fix: give OpenCode a bounded code lane with disjoint files, exact tests, a deny-by-default permission profile, and mandatory Codex review—for example the standalone `check_assets.py` generalization after its configuration interface is frozen.
+
+7. **blocking — `00-contracts/agent-memory.md:73-89` — the strongest argument against assigning OpenCode critical code lanes is not shell access but insufficient evidence of reliable autonomous implementation under real lane conditions.** Failure scenario: the free preview model passes a trivial shell probe but wanders, times out, misunderstands cross-file invariants, or produces an unreviewable partial diff during a large executor refactor. Required fix: graduate it through a small reversible code lane with an objective oracle before assigning shared infrastructure, Git surgery, security-sensitive permissions, or the executor/overlay path.
+
+## What I could not verify
+
+- I could not identify the exact historical OpenCode failure because the original command, stderr, OpenCode version, cwd, active agent configuration, and permission prompt were not present in the reviewed files.
+- I could not verify that the proposed allowed pytest/self-check commands are side-effect-free; an allowed interpreter or test runner can execute arbitrary repository code.
+- I could not verify OS-level containment around the OpenCode process. A git worktree alone provides none.
+- I could not verify the eventual `course.yaml`, `config.py`, `new_course.py`, overlay API, or EV3 specialist implementation because they are planned rather than present.

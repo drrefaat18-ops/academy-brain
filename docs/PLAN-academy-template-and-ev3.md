@@ -2,7 +2,7 @@
 type: plan
 status: judged-draft
 date: 2026-08-21
-council: claude (lane), codex (lane, 2 runs), opencode (lane), hermes (FAILED — 4th consecutive hang)
+council: claude (lane), codex (lane, 2 runs), opencode (lane), hermes (no lane — timeout too short; cause since fixed)
 judges: opus + codex
 purpose: >-
   Turn this vault from a micro:bit course workspace into a reusable Techno Square
@@ -19,7 +19,7 @@ purpose: >-
 | claude | delivered |
 | codex | delivered (2 runs, second superseded first) |
 | opencode | delivered late (18 KB); its sandbox blocked shell calls, its file reads worked |
-| hermes | **FAILED — 4th consecutive hang**, identical signature (alive, 0 CPU, 0 bytes). Killed. Excluded. |
+| hermes | **No lane delivered.** Recorded at the time as a 4th consecutive hang. That diagnosis was wrong: a later investigation (`agent-memory.md:52-72`) found real calls legitimately take 90–220s, so the 100–120s timeout in use killed them mid-run — indistinguishable from a hang. Fixed by `timeout 300` + `-m tencent/hy3:free` + `< /dev/null`, verified 8/8 sequential. Hermes was excluded from the council for a defect that was ours, not its. It is therefore eligible for the reviewer role assigned below. |
 
 **Judging note.** Every checkable claim in the Codex lane was verified against the
 real files before acceptance. All passed. Codex found two things the Claude lane
@@ -309,17 +309,246 @@ Also preserve the *process* that caught them: render every PDF to frames, inspec
 ## Execution order
 
 - **A** — Freeze: commit unrelated dirt, tag, branch. Add the five root causes as regression fixtures. **Extract `_TEMPLATE-debugging-lab.md` before anything moves.**
-- **B** — Extract: neutral contracts, `config.py`, config-driven `paths.py`. Fix the s8 bug and the `rubric.md` age-band contradiction here. Confirm `--self-check` + `pytest` still pass.
-- **C** — Parameterize: `generate_session.py`, `check_assets.py`, gates, ingest adapters, renderer adapters. Replace `enforce_blueprint_gate` with typed approvals. **Build the post-export overlay step and the fail-closed unfilled-region check (§5b) here — it is the single largest functional gap in the current executor.**
+- **B** — Extract: neutral contracts, `config.py`, config-driven `paths.py`. Fix the s8 bug and the `rubric.md` age-band contradiction here. Its public configuration/path API and consumer-contract tests must be **APPROVED** before C1 executor work starts.
+- **C0** — OpenCode graduation lane: generalize only `check_assets.py` asset discovery against a frozen interface, using a small reversible diff and an objective fixture oracle.
+- **C1** — One Claude-owned executor lane, in order: integrate B's approved API; replace `enforce_blueprint_gate` with typed approvals; add §5b reconciliation; add the post-export overlay and fail-closed unfilled-region check; run shared integration tests. There is no C2/C3 hand-off and no second writer on `generate_session.py`.
+- **C4** — Neutralize remaining micro:bit-specific contract/template prose. It may start after A.
 - **D** — Specialist: neutral definition, skill, provider adapters, `knowledge/ev3/` intake.
 - **E** — Instantiate an empty EV3 course from the template.
-- **F** — Source EV3 facts and the academy kit inventory. Nothing is asserted before this.
+- **F1** — Codex sources manufacturer/official EV3 facts now. Unsettled facts remain `NEEDS_SOURCING` or `UNVERIFIED`.
+- **F2** — Inventory the physical academy kit only when a person can inspect it. This alone is `physical_action_required`: request only label text, quantities, and photographs of identifying labels, never robotics judgment.
 - **G** — One pilot session end-to-end through gates before scaling.
 
 Archiving happens inside **A**, before the refactor's fixtures exist only in archived form — hence step 4 of §6 creating the sanitized fixture is a prerequisite of **B**, not an afterthought.
 
+## Execution split, review loop, and ownership
+
+Three builders: **claude** (Opus, this session), **codex**, **opencode**. Only F2
+may reach the owner because it requires inspection of physical academy property.
+Everything else is agent-resolvable under `00-contracts/agent-memory.md`.
+
+### Who builds what
+
+The historical cause of OpenCode's failed shell call is **UNVERIFIED**. Settle it
+by retaining the original stderr/session log and reproducing the original command
+once without `--auto` and once with it while holding OpenCode version, model
+(`opencode/x-preview-f-free`), agent, cwd, prompt, timeout, and environment constant;
+record the exact permission request and result. Until then the plan asserts no root
+cause for that historical failure.
+
+| Step | Work | Builder | Why |
+|---|---|---|---|
+| **A** | Freeze: tag `microbit-final`, branch `archive/microbit`. Extract `_TEMPLATE-debugging-lab.md` before anything moves. | claude | Git surgery + doctrine authoring. Irreversible; single owner. |
+| **B** | `config.py`, config-driven `paths.py`, fix the s8 bug. Keep `--self-check` + `pytest` green. | codex | Mechanical refactor with a hard test oracle. Codex's strongest shape. |
+| **C0** | Generalize asset discovery only; no configuration wiring and no executor edit. | opencode | First real code lane: small, reversible, objectively tested. |
+| **C1** | All `generate_session.py` work: config integration, typed approvals, reconciliation, overlay, final assertion, integration tests. | claude | One builder owns the coupled executor behavior end-to-end. |
+| **C4** | Neutralize `brand-and-output.md`, `rubric.md`, and `_TEMPLATE-blueprint.md`. | opencode, after C0 approval | Disjoint text-only paths. |
+| **D** | EV3 specialist: neutral definition, skill, provider adapters, `knowledge/ev3/` intake schema. | claude | Doctrine authoring + the anti-hallucination contract. |
+| **E** | Instantiate an empty EV3 course in a temp dir and run the full proof below. | codex | Verification-shaped. Adversarial by nature. |
+| **F1** | Manufacturer/official-source research with source locators and uncertainty. | codex | Agent-resolvable and can start now. |
+| **F2** | Physical academy kit inventory only. | `physical_action_required` — owner/academy custodian | A person reads labels and counts hardware; agents interpret the observations. |
+| **G** | One pilot session end-to-end through all gates. | claude, codex reviews | Full-pipeline judgment call. |
+
+**Authoritative per-file ownership matrix.** These are the only source files these
+lanes may edit. Every path appears once with one lane and builder. If a lane needs
+another file, it stops until this matrix is amended before work begins; generated
+temp-course files are E outputs, not source edits.
+
+| File path | Owning lane | Owning builder |
+|---|---|---|
+| `75-bundle/_TEMPLATE-debugging-lab.md` | A | claude |
+| `scripts/swarm/config.py` | B | codex |
+| `scripts/swarm/paths.py` | B | codex |
+| `tests/test_paths.py` | B | codex |
+| `tests/test_course_config.py` | B | codex |
+| `scripts/swarm/check_assets.py` | C0 | opencode |
+| `tests/test_check_assets.py` | C0 | opencode |
+| `scripts/swarm/generate_session.py` | C1 | claude |
+| `tests/test_generate_session.py` | C1 | claude |
+| `00-contracts/brand-and-output.md` | C4 | opencode |
+| `00-contracts/rubric.md` | C4 | opencode |
+| `75-bundle/_TEMPLATE-blueprint.md` | C4 | opencode |
+| `.claude/skills/ev3-course-specialist/SKILL.md` | D | claude |
+| `knowledge/ev3/intake-schema.yaml` | D | claude |
+| `scripts/swarm/new_course.py` | E | codex |
+| `tests/test_new_course.py` | E | codex |
+| `knowledge/ev3/source-catalog.yaml` | F1 | codex |
+| `knowledge/ev3/physical-inventory.yaml` | F2 | claude records owner/custodian observations |
+
+The matrix eliminates the former C1/C2/C3 collision. A git worktree supplies branch
+and merge isolation only; it does **not** isolate processes, credentials, network,
+other worktrees, global configuration, or absolute filesystem paths. Delegated lanes
+also require least-privilege credentials and OS-level filesystem/process/network
+containment appropriate to the host.
+
+### Required OpenCode lane configuration and graduation gate
+
+Do not use `--auto` as a security boundary. C0 runs in a disposable worktree with
+OS-level containment and this deny-by-default configuration; command patterns are
+last-match-wins, so the catch-all deny is first:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "*": "deny",
+    "read": {"*": "allow", "*.env": "deny", "*.env.*": "deny", "*.env.example": "allow"},
+    "glob": "allow", "grep": "allow", "list": "allow", "lsp": "allow",
+    "edit": "allow",
+    "bash": {
+      "*": "deny",
+      "git status": "allow", "git status *": "allow",
+      "git diff": "allow", "git diff *": "allow",
+      "git log": "allow", "git log *": "allow",
+      "python --version": "allow",
+      "python -m pytest": "allow", "python -m pytest *": "allow",
+      "pytest": "allow", "pytest *": "allow",
+      "python scripts/swarm/check_assets.py --self-check": "allow",
+      "python scripts/swarm/generate_session.py --self-check": "allow"
+    },
+    "external_directory": "deny", "task": "deny",
+    "webfetch": "deny", "websearch": "deny", "question": "deny"
+  }
+}
+```
+
+An allowed interpreter or test runner can execute arbitrary repository code, so the
+permission layer is not containment by itself. OpenCode graduates only after C0
+produces a reviewable diff and passes pre-authored fixtures for known assets,
+declared-to-create assets, unknown names, missing source files, and paths outside the
+bundle, followed by Codex `APPROVED`. Before that it receives no shared
+infrastructure, Git surgery, permission work, executor work, or overlay work.
+
+**E proof, not grep alone:** run `new_course.py`; validate configuration/schema;
+import generated Python modules; run every relevant `--self-check` and full `pytest`;
+run path-containment tests; assert semantic fixtures for session counts,
+artifact/no-artifact sessions, language, renderer, bundle filenames, and provider
+topology; then run `rg -i "micro:?bit|makecode"` over the generated course.
+
+### The review loop
+
+Every lane's output passes the same three rungs, cheapest first. A lane that fails
+rung 1 never reaches a reviewer — no model time is spent on work the machine can
+already prove broken.
+
+| Rung | Reviewer | Catches | Cost |
+|---|---|---|---|
+| **1. Tests and gates** | neither model — `pytest`, `--self-check`, the markup-leak linter, `check_assets.py`, the fail-closed region check | everything mechanical: broken imports, regressed sessions, unfilled regions, leaked markup, missing assets | free, seconds |
+| **2. Adversarial cross-model review** | a **different model** than the builder, using the independent oracle below | design errors, missed requirements, wrong file touched, requirement satisfied in letter but not spirit | one call |
+| **3. Owner** | Dr. Refaat | **nothing in this section.** Reserved for `owner_business` and `physical_action_required` only. | — |
+
+**Rung 1 is non-negotiable and runs first.** It is the only reviewer with no model
+bias, and most of this work is scripts with a hard test oracle — the machine catches
+more of it than either model will.
+
+### Independent oracle and reviewer assignment — cross-model, never self
+
+Before a builder starts, the assigned oracle author derives acceptance fixtures
+directly from the contracts without reading the implementation. They include
+negative/mutation cases for no-artifact sessions, unknown asset names, external
+paths, and alternate renderer/language configurations; the builder may run them but
+may not weaken them. Codex authors and commits the oracle before Claude/OpenCode
+lanes; Hermes does so before Codex lanes. The oracle author verifies at final review
+that the fixtures were neither removed nor made vacuous.
+
+| Builder | Adversarial reviewer |
+|---|---|
+| claude | **codex** |
+| opencode | **codex** |
+| **codex** | **Hermes blind requirements review, then claude integration review** |
+
+Codex is the primary reviewer: it earned that in the council round, catching the
+asset regex coupling at `scripts/swarm/check_assets.py:18` and the s8 contract/code
+contradiction that the claude lane missed.
+
+**Codex does not review its own work — not even with fresh context.** Clearing a
+model's context clears its memory, not its disposition: it keeps the same idioms,
+the same API assumptions, and the same blind spots that produced the defect. It
+reads its own style as correct because it *is* its style. Same-model self-review
+systematically over-approves, and the defect class it cannot see is precisely the
+one it just wrote. Codex lanes therefore receive a blind requirements review from
+Hermes, which did not co-author this split; Claude reviews integration only and is
+not the sole acceptor. OpenCode is not promoted to blind reviewer before C0 proves
+real lane reliability; shell access alone is not that proof.
+
+The blind reviewer plus pre-implementation contract fixtures provides an independent
+check against a specification error copied identically into code and builder tests.
+
+### Verdict protocol
+
+The reviewer returns exactly one verdict, machine-readable, written to
+`90-receipts/<step>.review.yaml`:
+
+```yaml
+step: C1
+builder: claude
+reviewer: codex
+verdict: BLOCKED          # APPROVED | BLOCKED
+rung1:                    # tests and gates, always recorded
+  pytest: PASS
+  self_check: PASS
+findings:
+  - id: C1-01
+    severity: blocking    # blocking | advisory
+    file: scripts/swarm/check_assets.py
+    line: 18
+    problem: <one sentence — the defect>
+    failure_scenario: <concrete input/state -> wrong output>
+    required_fix: <what must change>
+```
+
+Rules:
+
+1. **`BLOCKED` if any blocking finding exists, or if rung 1 failed.** A reviewer may
+   not issue `APPROVED` over a failing test — rung 1 is not waivable by verdict.
+2. **The builder fixes and resubmits.** The lane loops: build → rung 1 → review →
+   fix → rung 1 → review. It exits **only** on `APPROVED`.
+3. **Every iteration reruns the complete non-waivable suite**, never a predicted
+   subset. After the final fix, the reviewer performs a full-lane adversarial review
+   of the complete diff, contracts, ownership matrix, oracle fixtures, negative/
+   mutation cases, and all suite results. Advisories become named follow-ups.
+4. **The loop has no iteration cap.** A step that cannot reach `APPROVED` is a
+   design problem, not a budget problem — it escalates to a redesign of that step,
+   not to the owner.
+5. **Adversarial means adversarial.** The reviewer's job is to find what is wrong,
+   with a default of skepticism: assume the work is broken until the diff and the
+   tests show otherwise. "Looks fine" is not a review. A review with zero findings
+   must state what was actually checked and how.
+6. **Dependencies are per substep.** A → B → C1. B's public configuration/path API
+   and consumer-contract tests must be `APPROVED` before C1 executor work starts.
+   Within C1: config integration → typed approvals → reconciliation → overlay/final
+   assertion. C0 asset-discovery behavior may proceed against B's frozen interface,
+   but its configuration wiring waits for B approval. C4 may start after A. B →
+   D-definition. D plus completed template/scaffolder → E. F1 and F2 → G; F2 does
+   not block A–E.
+7. **Nothing in this loop reaches the owner.** A blocked lane is agent work. Per
+   `agent-memory.md`, forwarding a defect list to the owner is itself a defect.
+
+---
+
 ## Open questions for the owner (business only — nothing agent-resolvable)
 
-1. Which EV3 programming environment does the academy use, and which version?
-2. Which EV3 kit(s) does the academy physically own, and how many?
-3. EV3 course shape: how many levels, how many sessions each, and is there an s8-style graduation session?
+**Status: one narrow physical question is parked; agent sourcing is active.** The
+owner has NOT received the academy content (confirmed 2026-08-22). F1 starts now
+from manufacturer/official sources; unsettled claims remain `NEEDS_SOURCING` or
+`UNVERIFIED` and are never guessed.
+
+Do not ask the owner for robotics facts or research. Steps A–E are agent work and
+need no inventory answer. Only G needs both sourced facts and physical inventory.
+
+| # | Question | Answer likely comes from |
+|---|---|---|
+| 1 | Which EV3 programming environment/version is evidenced? | F1 official research, then delivered content; otherwise `NEEDS_SOURCING` |
+| 2 | What kit label text and quantities are physically present? | F2 owner/academy custodian reads labels/counts and supplies identifying-label photographs |
+| 3 | What course shape is specified: levels, sessions, graduation session? | delivered content; otherwise `UNVERIFIED` |
+
+**Now and on content arrival — agents do this, not the owner:**
+
+1. Read the delivered EV3 material and answer whatever it answers. Record each
+   answer with its locator (file + page/section) in `knowledge/ev3/source-catalog.yaml`.
+2. F1 records only manufacturer/official claims with URLs and locators. Anything
+   unsettled stays `NEEDS_SOURCING` or `UNVERIFIED`.
+3. Only F2 reaches the owner/custodian: report physical label text, quantities, and
+   identifying-label photographs. Agents interpret them; the owner is not asked to
+   identify compatibility, choose software, or make robotics judgments.
+4. Whatever is settled is written into `course.yaml`, which is what steps E–G read.
