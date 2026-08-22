@@ -232,6 +232,22 @@ the same actor is invalid regardless of its verdict.
 
 ---
 
+## 8b. The precondition that blocks every EV3 approval today
+
+`UNVERIFIED` blocks approval, and `UNVERIFIED` is what an applicability check
+returns when the kit is unknown. `knowledge/ev3/physical-inventory.yaml` does
+not exist yet. **Therefore no EV3 run can reach APPROVED today, and that is
+correct, not a bug** — approving hardware content without knowing which kit the
+academy owns is exactly the failure this doctrine exists to prevent.
+
+The single unblocker is step F2 in `docs/PLAN-academy-template-and-ev3.md`: the
+owner reads the EV3 kit box labels, counts them, and photographs the labels.
+That is a physical action nobody else can perform. It requires no robotics
+judgment, and it is the ONLY EV3 task that belongs to him.
+
+Until then, produce claims and receipts normally and let them carry
+`UNVERIFIED` with the hole recorded. Do not soften a status to clear the gate.
+
 ## 9. Enforcement status — read this before trusting any rule above
 
 Honesty note, added after adversarial review (2026-08-22). The plan says

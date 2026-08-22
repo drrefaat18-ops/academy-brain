@@ -358,6 +358,12 @@ specialist_receipt:
     # D3-05: UNVERIFIED is a non-shipping status per status_values above, so a
     # run carrying a required UNVERIFIED claim must not report APPROVED.
     - "verdict APPROVED is invalid if any required claim has status NEEDS_SOURCING, REFUTED, or UNVERIFIED"
+    # Consequence, stated so nobody reads the deadlock as a broken pipeline:
+    # applicability cannot be confirmed while knowledge/ev3/physical-inventory.yaml
+    # is absent, so every hardware claim is UNVERIFIED and NO run can reach
+    # APPROVED. The only unblocker is plan step F2 — the owner photographs and
+    # counts the kit labels. Do not soften a status to clear this gate.
+    - "known_deadlock: no APPROVED verdict is reachable until physical-inventory.yaml exists (plan step F2)"
     - "review_receipt is a list, never a bare mapping"
   status: NOT_ENFORCED
 
