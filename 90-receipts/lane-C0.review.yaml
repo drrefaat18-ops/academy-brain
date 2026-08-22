@@ -220,3 +220,59 @@ iteration_4:
 verification_iteration_4:
   suite: "180 passed, 1 skipped"
   real_bundle: "75-bundle/L1-s1 unchanged: 21 present, 1 to create"
+
+# ---------------------------------------------------------------------------
+# Iteration 5 — BLOCKED, 4 findings, all accepted, all fixed.
+# ---------------------------------------------------------------------------
+
+iteration_5:
+  verdict: BLOCKED
+  blocking: 4
+  reviewer: codex (read-only sandbox; could not run pytest, and said so)
+  root_cause: >
+    The lane's fail-closed rule was applied to DISCOVERY but not to the two
+    things discovery feeds: what counts as an asset on disk, and what counts as
+    a declaration. Both still had a quiet path.
+  fixes_applied:
+    - finding: C5-01
+      action: >
+        A broken assets/ symlink was indistinguishable from an absent assets/
+        directory, because exists() follows the link. Absent is legal, so the
+        bundle audited as all-to-be-created and passed. is_symlink() is now
+        checked first and a dangling link raises DiscoveryError.
+      verified: >
+        By reading, not by execution — creating a symlink on this machine needs
+        a privilege the account does not hold (WinError 1314). The regression
+        test skips rather than silently passing on such a host.
+    - finding: C5-02
+      action: >
+        "Declared to be created" was a substring scan of the whole SOURCES.md.
+        Replaced with _declared_to_create(), which reads only rows in the
+        "Assets that must be CREATED" table. No section means nothing declared,
+        so unmatched references become DANGLING and the gate fails.
+      verified: >
+        By execution against the live 75-bundle/L1-s1/SOURCES.md. It lists
+        img-05.png at line 25 as an EXISTING reference source, so under the old
+        scan a deleted img-05.png was reported as planned work rather than as a
+        broken reference. The new parser returns exactly the 7 real to-create
+        rows and does not contain img-05.png.
+    - finding: C5-03
+      action: >
+        asset_source_files entries were hashed for duplicate detection before
+        being type-checked, so a YAML mapping raised an unhashable-type
+        TypeError from inside the validator and made the validator's own error
+        branch unreachable. Entries are type-checked first.
+      verified: "By execution — reproduced TypeError: unhashable type: 'dict'."
+    - finding: C5-04
+      action: >
+        resolved.iterdir() sat outside the per-entry try, so an OSError from
+        listing the directory escaped the CLI as a raw traceback instead of a
+        controlled gate failure. Listing is now wrapped.
+      verified: "By execution, monkeypatching Path.iterdir to raise OSError."
+  suite: "187 passed, 2 skipped"
+  reviewer_quality_note: >
+    C5-02 is the one that mattered. It is the same defect the lane has been
+    rejected for four times — a check that passes on the strength of a string
+    appearing somewhere — and it survived four rounds because the phrase
+    "declared in SOURCES.md" sounded like a check. The reviewer found it by
+    asking what a declaration IS, which no amount of re-reading the code does.

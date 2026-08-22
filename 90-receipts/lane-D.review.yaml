@@ -309,3 +309,54 @@ iteration_4:
     D4-01 through D4-03 are all the same shape as D3-04 and land in the files
     that were claimed to match the schema "field-by-field". Matching means
     re-deriving the prose from the table, not eyeballing it.
+
+# ---------------------------------------------------------------------------
+# Iteration 5 — BLOCKED, 4 findings, all accepted. First run of this round died
+# on MCP transport errors and was re-dispatched; only the clean run was scored.
+# ---------------------------------------------------------------------------
+
+iteration_5:
+  verdict: BLOCKED
+  blocking: 4
+  reviewer: codex (read-only sandbox)
+  root_cause: >
+    Iteration 4 fixed the prose that CONTRADICTED the schema. It did not fix the
+    prose that stated rules the schema never had, or examples that violate the
+    table they sit under. Agreement was checked in one direction only.
+  fixes_applied:
+    - finding: D5-01
+      action: >
+        The §7 QA checklist still asked for the binary sourced/unsourced model
+        that fields_by_status replaced. It now checks that every statement
+        carries exactly one canonical status satisfying fields_by_status, and
+        asks explicitly whether UNVERIFIED was kept apart from NEEDS_SOURCING.
+    - finding: D5-02
+      action: >
+        The question of which physical faults are safe for an 8-to-10-year-old
+        to induce was labelled UNVERIFIED. Nothing has been cited for it at all,
+        so it is NEEDS_SOURCING. UNVERIFIED implies a source exists and hides
+        that the work has not started — on a child-safety question.
+    - finding: D5-03
+      action: >
+        The prose required specialist + refuter + reviewer for every
+        specialist_council decision; the schema requires a refuter only for
+        high-severity calls. The prose was blocking ordinary decisions the
+        schema allows. Corrected to match, rather than tightening the schema:
+        the drift direction here made the process heavier, not looser, and it
+        still has to be the schema that decides.
+    - finding: D5-04
+      action: >
+        The receipt example showed ONE claim with a status union and
+        placeholder citation strings, so copying it produces a NEEDS_SOURCING
+        claim carrying a source — a violation of the table printed directly
+        above it. Replaced with four concrete examples, one per status.
+      verified: >
+        By execution — the example block is parsed with yaml.safe_load, the four
+        statuses asserted present, and the NEEDS_SOURCING example asserted to
+        carry null for both source_id and locator.
+  suite: "187 passed, 2 skipped"
+  reviewer_quality_note: >
+    D5-03 is the useful one to record: every prior finding in this lane drifted
+    toward accepting less evidence, so the checks had all been aimed that way.
+    This one drifted toward demanding more, and was still a defect. Agreement
+    with the schema has to be checked in both directions.

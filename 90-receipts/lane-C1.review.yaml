@@ -80,3 +80,63 @@ reviewer_quality_note: >
   gates that reported success without checking, and this gate did the same thing
   in a different costume. It was found by reasoning about interrupted runs, not
   by running the suite — the reviewer could not run pytest at all.
+
+# ---------------------------------------------------------------------------
+# Iteration 5 — BLOCKED, 4 findings (2 blocking, 2 test coverage). All fixed.
+# ---------------------------------------------------------------------------
+
+iteration_5:
+  verdict: BLOCKED
+  blocking: 2
+  non_blocking: 2
+  reviewer: codex (read-only sandbox; could not run pytest, and said so)
+  root_cause: >
+    Iteration 4 replaced a marker-absence proof with an image-COUNT proof. The
+    count is a document-wide total, so it is not a proof about the expected
+    assets at all — it is the same defect one level up, and it was introduced by
+    the fix for that defect.
+  fixes_applied:
+    - finding: C1-5-01
+      action: >
+        assert_filled compared the total number of embedded images against the
+        number of expected assets. Any deck carrying brand chrome or a mascot
+        already clears that count, so an interrupted run that redacted every
+        marker and inserted nothing still passed. overlay() now records the ids
+        it actually placed into the PDF metadata, and assert_filled requires a
+        record for each expected asset. Proof per asset, not per document.
+      verified: >
+        By construction. The interrupted-run fixture now embeds decoy images
+        first; the old check passes on it (3 images >= 1 expected) and the new
+        one raises. Both directions are covered — a properly overlaid deck must
+        still pass, and does.
+    - finding: C1-5-02
+      action: >
+        The duplicate-id hard stop lived only in _evidence_map, which sees one
+        pass's evidence subset. A collision between two REFERENCE rows, or
+        across two passes, cleared preflight entirely and was settled by
+        whichever row parsed last. The check moved into enforce_asset_gate, over
+        every row, canonicalised (strip + casefold), naming both slides and both
+        filenames.
+      verified: >
+        By execution, and against the live 75-bundle/L1-s1/ASSET-MAPPING.md —
+        22 rows, no duplicates, so the new check does not break the real file.
+    - finding: C1-5-03
+      action: >
+        Accepted. The interrupted-run regression test used a PDF with zero
+        images, so it never exercised the masking case. The fixture takes a
+        decoys argument and the new test embeds three.
+    - finding: C1-5-04
+      action: >
+        Accepted in substance: a gate-level duplicate test now exists over
+        REFERENCE rows through enforce_asset_gate. The reviewer additionally
+        asked for row NUMBERS in the message; the message names the slide and
+        the filename of both rows instead, which identifies them for a human
+        without threading a row index through parse_asset_mapping. Recorded as a
+        deliberate deviation, not an oversight.
+  suite: "187 passed, 2 skipped"
+  reviewer_quality_note: >
+    Second round running in which the reviewer's best finding is a defect in the
+    previous round's FIX. The pattern is now established well enough to state as
+    a rule: a fix for a fail-open is itself a prime suspect for a fail-open,
+    because it is written under the assumption that the author now understands
+    the defect.
