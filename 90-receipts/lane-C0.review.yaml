@@ -276,3 +276,34 @@ iteration_5:
     appearing somewhere — and it survived four rounds because the phrase
     "declared in SOURCES.md" sounded like a check. The reviewer found it by
     asking what a declaration IS, which no amount of re-reading the code does.
+
+# ---------------------------------------------------------------------------
+# Round 7 (iteration 6) - final-pass cross-model review. 1 finding, accepted,
+# fixed by opencode, independently verified by claude (grep + full pytest).
+# ---------------------------------------------------------------------------
+
+iteration_6:
+  verdict: BLOCKED
+  blocking: 1
+  builder: opencode
+  reviewer: cross-model final pass
+  findings:
+    - id: C0-17
+      severity: high
+      problem: >
+        discovery_for()'s ancestor walk used manifest.is_file(), which follows
+        symlinks. A manifest that is a broken symlink reads exactly like an
+        absent manifest, so the walk continued upward and silently adopted an
+        ancestor course's naming/expect_references instead of failing.
+      fix: >
+        The walk now checks manifest.exists() first; if false AND the path
+        is_symlink(), it raises DiscoveryError naming the dangling link instead
+        of continuing upward. A manifest that exists but is not a regular
+        file, or that cannot be inspected (OSError), also raises rather than
+        continuing. Genuinely absent (no file, no symlink) still continues.
+  verified_by_claude:
+    method: >
+      grep against live scripts/swarm/check_assets.py confirming the
+      three-way branch (absent -> continue; symlink -> DiscoveryError; not a
+      file / OSError -> DiscoveryError), plus full local pytest run.
+  suite: "208 passed, 4 skipped"

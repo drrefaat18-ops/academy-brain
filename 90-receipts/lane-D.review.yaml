@@ -360,3 +360,32 @@ iteration_5:
     toward accepting less evidence, so the checks had all been aimed that way.
     This one drifted toward demanding more, and was still a defect. Agreement
     with the schema has to be checked in both directions.
+
+# ---------------------------------------------------------------------------
+# Round 7 (iteration 6) - final-pass cross-model review. 1 finding, accepted,
+# fixed by opencode, independently verified by claude (grep).
+# ---------------------------------------------------------------------------
+
+iteration_6:
+  verdict: BLOCKED
+  blocking: 1
+  builder: opencode
+  reviewer: cross-model final pass
+  findings:
+    - id: D6-01
+      severity: medium
+      problem: >
+        The claim-record templates in .claude/agents/ev3-specialist.md and
+        .claude/skills/ev3-course-specialist/SKILL.md did not carry a
+        severity field, even though knowledge/ev3/intake-schema.yaml's
+        claim_card.required list includes it. A specialist following the
+        agent/skill prose would produce a record the canonical schema
+        rejects.
+      fix: >
+        severity: high | medium | low added to both files' claim-record
+        field lists, matching intake-schema.yaml exactly.
+  verified_by_claude:
+    method: >
+      grep confirming "severity" present at
+      .claude/agents/ev3-specialist.md:69 and
+      .claude/skills/ev3-course-specialist/SKILL.md:66.

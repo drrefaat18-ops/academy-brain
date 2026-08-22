@@ -140,3 +140,36 @@ iteration_5:
     a rule: a fix for a fail-open is itself a prime suspect for a fail-open,
     because it is written under the assumption that the author now understands
     the defect.
+
+# ---------------------------------------------------------------------------
+# Round 7 (iteration 6) - final-pass cross-model review. 1 finding, accepted,
+# fixed by opencode, independently verified by claude (grep + full pytest).
+# ---------------------------------------------------------------------------
+
+iteration_6:
+  verdict: BLOCKED
+  blocking: 1
+  builder: opencode
+  reviewer: cross-model final pass
+  findings:
+    - id: C1-6-01
+      severity: high
+      problem: >
+        overlay.py's assert_filled() proved a placement survived only by
+        checking the xref's membership in page.get_images(full=True). A
+        redaction (add_redact_annot + apply_redactions with
+        PDF_REDACT_IMAGE_REMOVE) can leave the xref listed in page resources
+        while the drawn instance is gone, so a blanked-out placement still
+        counted as present.
+      fix: >
+        assert_filled() now additionally requires
+        page.get_image_rects(xref) to be non-empty for the recorded page. An
+        xref listed but with no placement rect is reported as gone, naming
+        the page and xref.
+  verified_by_claude:
+    method: >
+      grep against live scripts/swarm/overlay.py confirming the added
+      get_image_rects() check; new regression test in tests/test_overlay.py
+      (content-stream blanking, not full redaction, since redaction removes
+      the resource entry outright) re-run; full local pytest run.
+  suite: "208 passed, 4 skipped"

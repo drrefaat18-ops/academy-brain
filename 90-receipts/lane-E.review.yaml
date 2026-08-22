@@ -1,0 +1,61 @@
+step: E
+builder: opencode
+reviewer: cross-model final pass (round 7)
+date: 2026-08-23
+iteration: 1
+verdict: BLOCKED
+blocking: 1
+status_after_fixes: fixed, verified, committed
+
+# Round 7 (final-pass) cross-model review found one finding against
+# scripts/swarm/new_course.py: the atomic-scaffold gap.
+
+findings:
+  - id: E1-01
+    severity: high
+    problem: >
+      new_course.create() mutated the target directory directly (mkdir,
+      copy scaffold, write manifest) and only validated by loading the
+      manifest back afterward. A failure partway through — a bad
+      asset_ref_pattern, an interrupted copy — left target non-empty but
+      unusable, and the next attempt then refused it as "not empty"
+      instead of retrying cleanly.
+    fix: >
+      create() now stages everything (STAGE_DIRS, _copy_scaffold, the
+      manifest, topology.md) in a tempfile.mkdtemp sibling directory,
+      validates via config.load_course(staging), and only renames staging
+      into target on success. Any exception during staging removes the
+      staging dir and re-raises; target is never touched until the staged
+      result is proven to load. Seed.validate() also extended to check
+      every field (name, levels, sessions_per_level, providers,
+      asset_source_files, asset_ref_pattern compiles with exactly one
+      capture group) before any filesystem mutation, not just slug and
+      schedule length.
+  - id: E1-03
+    severity: medium
+    problem: >
+      An empty pre-existing target directory (e.g. an interrupted prior
+      run's leftover empty dir) was accepted by _check_target but nothing
+      removed it before the atomic rename, so os.rename onto an existing
+      directory would fail on some platforms.
+    fix: >
+      An empty pre-existing target is removed immediately before the
+      staging directory is renamed into place.
+
+verified_by_claude:
+  method: >
+    grep against live scripts/swarm/new_course.py confirming
+    tempfile.mkdtemp staging, the try/except BaseException cleanup path,
+    and the extended Seed.validate() field checks; tests/test_new_course.py
+    updated (test_an_invalid_pattern_fails_at_creation_not_at_first_audit
+    now expects "exactly one capture group" instead of "does not load",
+    since Seed.validate() now refuses the two-group pattern before any
+    write); full local pytest run.
+suite: "208 passed, 4 skipped"
+
+graduation: GRANTED
+graduation_note: >
+  First review of new_course.py under this lane. One round, two related
+  findings (same root cause: no atomicity between validation and
+  mutation), both fixed and independently verified by execution. No
+  outstanding findings against this file.
