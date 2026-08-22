@@ -327,6 +327,17 @@ Also preserve the *process* that caught them: render every PDF to frames, inspec
 - **E** — Instantiate an empty EV3 course from the template.
 - **F1** — Codex sources manufacturer/official EV3 facts now. Unsettled facts remain `NEEDS_SOURCING` or `UNVERIFIED`.
 - **F2** — Inventory the physical academy kit only when a person can inspect it. This alone is `physical_action_required`: request only label text, quantities, and photographs of identifying labels, never robotics judgment.
+
+  **Owner ruling, 2026-08-22: F2 is stood down.** Abdeen supplied a course PDF
+  carrying the robot name and image, the code, and the lesson content, and the
+  owner has ruled a physical kit inspection unnecessary. That PDF becomes a
+  tier-1 source and is catalogued like any other.
+
+  One limit is recorded rather than argued: a vendor document establishes what
+  EV3 *is and does*, never what hardware is physically in this room. Claims that
+  turn on "do we own this part, in this quantity" therefore stay `UNVERIFIED`
+  with their source kept — they are sourced, just not confirmed for our kit. No
+  other claim is blocked, and nothing is routed to the owner on this basis.
 - **G** — One pilot session end-to-end through gates before scaling.
 - **H** — *(opened 2026-08-22 by codex's review of lane D)* Build the EV3 validators the
   doctrine currently only promises: claim-card schema validation and source resolution,
