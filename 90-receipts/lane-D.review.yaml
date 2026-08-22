@@ -254,3 +254,58 @@ iteration_3:
   reviewer_quality_note: >
     Third useful review. D3-04 is the standout: the builder's own "fix" for
     finding 5 had quietly made REFUTED claims unable to cite what refuted them.
+
+# ---------------------------------------------------------------------------
+# Iteration 4 — BLOCKED, 5 findings, all accepted. Two were corrections to
+# iteration-3 fixes.
+# ---------------------------------------------------------------------------
+
+iteration_4:
+  verdict: BLOCKED
+  blocking: 5
+  root_cause: >
+    fields_by_status landed in the schema in iteration 3 but the two prose
+    documents were never brought into line with it. Both still taught the old
+    binary model, so the canonical table and the instructions an agent actually
+    reads disagreed — and the prose is what gets followed.
+  fixes_applied:
+    - finding: D4-01
+      action: >
+        The agent file's output contract still said source_id and locator are
+        null for every non-SOURCED status, which is exactly the defect D3-04
+        fixed in the schema. Replaced with the full four-status rules, stating
+        that dropping them from a REFUTED claim destroys the evidence.
+    - finding: D4-02
+      action: >
+        SKILL.md declared only two citation states and asserted "There is no
+        third option." Rewritten around all four statuses, with an explicit
+        warning against collapsing UNVERIFIED into NEEDS_SOURCING: one has
+        evidence awaiting confirmation, the other has none, and they have
+        different remedies.
+    - finding: D4-03
+      action: >
+        A missing physical-inventory.yaml was instructed to emit NEEDS_SOURCING.
+        Corrected to UNVERIFIED keeping source_id and locator, because the
+        manufacturer citation is real; collapsing it sends someone to re-source
+        a claim that was already sourced.
+    - finding: D4-04
+      action: >
+        review_receipt was optional, so an APPROVED envelope carrying no
+        independent review at all was representable. Moved to
+        required_when_approved and backed by two new validation rules.
+    - finding: D4-05
+      action: >
+        The deadlock note was overstated — it read as though no EV3 run could be
+        approved until F2. The plan (line 565) says F2 does not block A-E.
+        Rescoped to inventory-dependent claims only; inventory-independent
+        claims are unaffected.
+  verification: >
+    Schema and the agent's embedded receipt block both re-parsed under
+    yaml.safe_load; fields_by_status asserted to cover all four status_values;
+    REFUTED asserted to require source_id; required_when_approved asserted to
+    contain review_receipt; both prose files asserted to no longer carry the
+    superseded universal claims. Suite: 180 passed, 1 skipped.
+  reviewer_quality_note: >
+    D4-01 through D4-03 are all the same shape as D3-04 and land in the files
+    that were claimed to match the schema "field-by-field". Matching means
+    re-deriving the prose from the table, not eyeballing it.

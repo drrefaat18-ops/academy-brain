@@ -353,18 +353,31 @@ specialist_receipt:
     holes:      "list of what is missing and what would settle each one"
   optional:
     approval_record: "one approval_record, when the run made a routed decision"
-    review_receipt:  "LIST of review_receipt records — a run can carry a reviewer pass and a refuter pass"
+  required_when_approved:
+    # Independent review is required by the skill before approval, but the schema
+    # only checked LIST cardinality *if the field was present* — so a run of purely
+    # SOURCED claims could declare APPROVED with no review receipt at all and
+    # satisfy every stated rule.
+    review_receipt: >
+      LIST of review_receipt records, at least one with role: reviewer. A run
+      carrying any high-severity claim additionally requires a role: refuter
+      record. A run can carry both passes; it may never carry none.
   validation:
     # D3-05: UNVERIFIED is a non-shipping status per status_values above, so a
     # run carrying a required UNVERIFIED claim must not report APPROVED.
     - "verdict APPROVED is invalid if any required claim has status NEEDS_SOURCING, REFUTED, or UNVERIFIED"
-    # Consequence, stated so nobody reads the deadlock as a broken pipeline:
-    # applicability cannot be confirmed while knowledge/ev3/physical-inventory.yaml
-    # is absent, so every hardware claim is UNVERIFIED and NO run can reach
-    # APPROVED. The only unblocker is plan step F2 — the owner photographs and
-    # counts the kit labels. Do not soften a status to clear this gate.
-    - "known_deadlock: no APPROVED verdict is reachable until physical-inventory.yaml exists (plan step F2)"
+    # Consequence, scoped. Applicability cannot be confirmed while
+    # knowledge/ev3/physical-inventory.yaml is absent, so any claim that depends
+    # on WHICH KIT WE OWN is UNVERIFIED and cannot be approved. That is correct.
+    # It does NOT block inventory-independent runs (software/firmware research,
+    # terminology, prerequisite structure) — the plan is explicit that F2 gates
+    # step G and does not block A-E. An earlier draft said no run could be
+    # approved at all, which would have stalled work needing nothing from the
+    # owner. Do not soften a status to clear this gate either way.
+    - "known_deadlock: claims depending on academy-kit applicability cannot reach APPROVED until physical-inventory.yaml exists (plan step F2); inventory-independent claims are unaffected"
     - "review_receipt is a list, never a bare mapping"
+    - "verdict APPROVED with no review_receipt is invalid"
+    - "verdict APPROVED covering a high-severity claim with no role: refuter record is invalid"
   status: NOT_ENFORCED
 
 review_receipt:

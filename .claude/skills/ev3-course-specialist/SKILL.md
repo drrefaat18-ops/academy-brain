@@ -24,10 +24,20 @@ explicit target — a session ID, a file, or a named artifact. No target ⇒ ask
 
 You may know things about EV3. That knowledge is a hypothesis to be sourced, not
 a fact to be emitted. Every externally checkable EV3 statement that leaves this
-skill carries a `source_id` and an exact locator, or it carries `NEEDS_SOURCING`.
+skill carries one of the four canonical statuses, and the citation rules follow
+from it (`claim_card.fields_by_status` in `knowledge/ev3/intake-schema.yaml`):
 
-There is no third option. "Commonly known", "standard for EV3", and "obviously"
-are all `NEEDS_SOURCING`.
+- `SOURCED` — `source_id` + exact locator. Usable.
+- `REFUTED` — `source_id` + exact locator, naming the source that CONTRADICTS it.
+  A citation is not evidence a claim is true; it is evidence of what was checked.
+- `UNVERIFIED` — sourced but applicability to our kit/firmware unconfirmed, or a
+  physical-outcome claim with no observation receipt. Keeps its source when it
+  has one; a locator is required whenever `source_id` is present.
+- `NEEDS_SOURCING` — no source exists. Both fields null.
+
+"Commonly known", "standard for EV3", and "obviously" are all `NEEDS_SOURCING`.
+Do not collapse `UNVERIFIED` into `NEEDS_SOURCING`: one has evidence awaiting
+confirmation, the other has none, and they have different remedies.
 
 ### Source hierarchy
 
@@ -236,9 +246,20 @@ the same actor is invalid regardless of its verdict.
 
 `UNVERIFIED` blocks approval, and `UNVERIFIED` is what an applicability check
 returns when the kit is unknown. `knowledge/ev3/physical-inventory.yaml` does
-not exist yet. **Therefore no EV3 run can reach APPROVED today, and that is
-correct, not a bug** — approving hardware content without knowing which kit the
-academy owns is exactly the failure this doctrine exists to prevent.
+not exist yet.
+
+**Scope, precisely:** this blocks approval of runs whose required claims depend
+on which kit the academy owns — hardware, part numbers, port behaviour, physical
+seeded bugs — and it blocks the end-to-end pilot (plan step G). It does NOT
+block a run whose required claims are inventory-independent: software/firmware
+research, terminology, prerequisite structure. Per the plan, F2 does not block
+steps A-E. An earlier draft of this section said no EV3 run could be approved at
+all, which was an overstatement that would have stalled work needing nothing
+from the owner.
+
+For the claims it does block, the block is correct, not a bug — approving
+hardware content without knowing which kit the academy owns is exactly the
+failure this doctrine exists to prevent.
 
 The single unblocker is step F2 in `docs/PLAN-academy-template-and-ev3.md`: the
 owner reads the EV3 kit box labels, counts them, and photographs the labels.

@@ -31,8 +31,15 @@ decision-maker on business matters.
 3. `knowledge/ev3/source-catalog.yaml` — what has actually been sourced.
 4. `knowledge/ev3/physical-inventory.yaml` — what kit the academy actually owns.
 
-If 3 or 4 is missing or empty, say so and emit `NEEDS_SOURCING` rather than
-proceeding on assumption.
+If either is missing or empty, say so rather than proceeding on assumption — but
+emit the RIGHT status, because they have different remedies:
+
+- no source catalog, or no source for the claim -> `NEEDS_SOURCING`
+- catalog fine but `physical-inventory.yaml` missing, and the claim depends on
+  which kit we own -> `UNVERIFIED`, KEEPING `source_id` and `locator`
+
+Collapsing the second into the first throws away a real manufacturer citation
+and sends someone to re-source a claim that was already sourced.
 
 ## Allowed reads
 
@@ -59,8 +66,17 @@ ask, do not begin.
 
 Machine-checkable files, never advice. Every claim in the record shape defined
 by the skill section 1: `claim`, `status`, `applicability`, `confidence`, plus
-`source_id` and `locator` which are required when `status: SOURCED` and null
-otherwise. Omitting `status` makes SOURCED and NEEDS_SOURCING indistinguishable.
+`source_id` and `locator`, whose rules depend on the status
+(`claim_card.fields_by_status`, canonical):
+
+- `SOURCED` — both required
+- `REFUTED` — both required; they name the source that refuted the claim, and
+  dropping them destroys the evidence
+- `UNVERIFIED` — `source_id` optional; `locator` required whenever `source_id`
+  is present
+- `NEEDS_SOURCING` — both null
+
+Omitting `status` makes SOURCED and NEEDS_SOURCING indistinguishable.
 
 ## Hard refusals
 
