@@ -122,11 +122,21 @@ def _asset_discovery(raw: Any, source: Path) -> AssetDiscovery:
         )
 
     files_raw = data["asset_source_files"]
-    if (
-        not isinstance(files_raw, list)
-        or not files_raw
-        or len(set(files_raw)) != len(files_raw)
-    ):
+    if not isinstance(files_raw, list) or not files_raw:
+        raise CourseConfigError(
+            f"{source}: asset_discovery.asset_source_files must be a non-empty list "
+            "of unique file names"
+        )
+    # Type-check every entry BEFORE hashing them. set() on a list holding a YAML
+    # mapping raises an unhashable-type TypeError from inside the validator, which
+    # escapes as a raw traceback and makes this error branch unreachable.
+    for entry in files_raw:
+        if not isinstance(entry, str) or not entry.strip():
+            raise CourseConfigError(
+                f"{source}: asset_discovery.asset_source_files entries must be "
+                f"non-empty strings; got {entry!r}"
+            )
+    if len(set(files_raw)) != len(files_raw):
         raise CourseConfigError(
             f"{source}: asset_discovery.asset_source_files must be a non-empty list "
             "of unique file names"

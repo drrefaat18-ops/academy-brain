@@ -327,10 +327,31 @@ def enforce_asset_gate(assets: list[Asset]) -> None:
     """DEC-030's hard stop: every row produced, every path on disk."""
     if not assets:
         raise HardStop("ASSET-MAPPING.md parsed to zero asset rows — refusing to guess")
+    # Duplicate ids belong here, not only in _evidence_map: that check sees one
+    # pass's evidence subset, so a duplicate among REFERENCE rows — or between two
+    # passes — cleared preflight entirely and was resolved later by whichever row
+    # happened to be last.
+    seen: dict[str, Asset] = {}
+    collisions: list[str] = []
+    for a in assets:
+        key = a.aid.strip().casefold()
+        first = seen.get(key)
+        if first is None:
+            seen[key] = a
+        else:
+            collisions.append(
+                f"{a.aid!r} on slides {first.slide} ({first.path.name}) and "
+                f"{a.slide} ({a.path.name})"
+            )
+
     unproduced = [a for a in assets if not a.produced]
     dangling = [a for a in assets if a.produced and not a.path.is_file()]
     unclassed = [a for a in assets if a.klass not in {"REFERENCE", "EVIDENCE"}]
     problems = []
+    if collisions:
+        problems.append(
+            "duplicate asset id(s) — one id must mean one file: " + "; ".join(collisions)
+        )
     if unproduced:
         problems.append(
             "not yet produced: " + ", ".join(f"{a.aid} [{a.status}]" for a in unproduced)

@@ -81,7 +81,10 @@ def _microbit_bundle(tmp_path):
         encoding="utf-8",
     )
     (b / "home-summary.md").write_text("- **Asset:** `tata-01.gif`\n", encoding="utf-8")
-    (b / "SOURCES.md").write_text("| `img-02.png` | to be created |", encoding="utf-8")
+    (b / "SOURCES.md").write_text(
+        "## Assets that must be CREATED before generation\n\n"
+        "| `img-02.png` | to be created |", encoding="utf-8"
+    )
     return b
 
 
@@ -418,7 +421,10 @@ def test_dangling_reference(tmp_path):
 def test_to_create_reference_declared_in_sources_md(tmp_path):
     b = _bare_bundle(tmp_path)
     (b / "slides-source.md").write_text("`img-later.png`\n", encoding="utf-8")
-    (b / "SOURCES.md").write_text("| `img-later.png` | to be created |", encoding="utf-8")
+    (b / "SOURCES.md").write_text(
+        "## Assets that must be CREATED before generation\n\n"
+        "| `img-later.png` | to be created |", encoding="utf-8"
+    )
     ok, to_create, dangling = check_assets.audit(b)
     assert to_create == ["img-later.png"]
     assert dangling == []
@@ -569,3 +575,69 @@ def test_missing_assets_dir_is_allowed(tmp_path):
     (b / "slides-source.md").write_text("`img-later.png`\n", encoding="utf-8")
     (b / "home-summary.md").touch()
     assert check_assets.audit(b)[2] == ["img-later.png"]
+
+
+# ---------------------------------------------------------------------------
+# Round 5. Four fail-open paths, all found by reading rather than by running.
+# ---------------------------------------------------------------------------
+
+
+def test_declared_means_a_row_in_the_create_table_not_a_mention(tmp_path):
+    """C5-02. img-05.png is listed as an EXISTING source in the real L1-s1
+    manifest. A substring scan classified a MISSING img-05.png as TO-CREATE —
+    a broken reference reported as planned work."""
+    bundle = _manifest(tmp_path / "b")
+    (bundle / "slides-source.md").write_text("`img-05.png`\n", encoding="utf-8")
+    (bundle / "home-summary.md").write_text("", encoding="utf-8")
+    (bundle / "SOURCES.md").write_text(
+        "## Sources\n\n"
+        "| 6 | key project images | `assets/img-05.png` |\n\n"
+        "## Assets that must be CREATED before generation\n\n"
+        "| File | Derived from |\n| --- | --- |\n"
+        "| `img-99.png` | `img-05.png` |\n",
+        encoding="utf-8",
+    )
+
+    ok, to_create, dangling = check_assets.audit(bundle)
+
+    assert dangling == ["img-05.png"], "a mention is not a declaration"
+    assert to_create == []
+    assert check_assets._declared_to_create(bundle) == {"img-99.png"}
+
+
+def test_no_create_section_declares_nothing(tmp_path):
+    """C5-02. Absence of the section must fail loud, not pass everything."""
+    bundle = _manifest(tmp_path / "b")
+    (bundle / "slides-source.md").write_text("`img-07.png`\n", encoding="utf-8")
+    (bundle / "home-summary.md").write_text("", encoding="utf-8")
+    (bundle / "SOURCES.md").write_text("`img-07.png` was rejected.\n", encoding="utf-8")
+
+    assert check_assets.audit(bundle)[2] == ["img-07.png"]
+
+
+def test_unlistable_assets_dir_is_a_clean_failure(tmp_path, monkeypatch):
+    """C5-04. iterdir() itself sat outside the per-entry try; an OSError there
+    escaped the CLI as a raw traceback instead of a gate failure."""
+    bundle = _manifest(tmp_path / "b")
+    (bundle / "assets").mkdir()
+
+    def boom(self):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(Path, "iterdir", boom)
+    with pytest.raises(check_assets.DiscoveryError, match="could not be listed"):
+        check_assets._assets_on_disk(bundle)
+
+
+def test_broken_assets_symlink_is_not_an_absent_directory(tmp_path):
+    """C5-01. exists() follows the link, so a broken assets/ link looked exactly
+    like the legal absent case and the bundle audited as all-to-be-created."""
+    bundle = _manifest(tmp_path / "b")
+    link = bundle / "assets"
+    try:
+        link.symlink_to(bundle / "nowhere", target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("creating symlinks needs privilege on this platform")
+
+    with pytest.raises(check_assets.DiscoveryError, match="resolves to nothing"):
+        check_assets._assets_on_disk(bundle)

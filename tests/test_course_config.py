@@ -75,3 +75,18 @@ def test_load_course_rejects_malformed_config(tmp_path, text, message):
 
     with pytest.raises(CourseConfigError, match=message):
         load_course(tmp_path)
+
+
+def test_non_string_source_file_is_a_config_error_not_a_typeerror(tmp_path):
+    """C5-03. set() on a list holding a YAML mapping raised an unhashable-type
+    TypeError from inside the validator, making its own error branch unreachable."""
+    write_config(
+        tmp_path,
+        VALID_CONFIG.replace(
+            "asset_source_files: [slides-source.md]",
+            "asset_source_files:\n    - {a: 1}",
+        ),
+    )
+
+    with pytest.raises(CourseConfigError, match="must be non-empty strings"):
+        load_course(tmp_path)

@@ -123,6 +123,15 @@ def _assets_on_disk(bundle: Path) -> set[str]:
     """
     assets = bundle / "assets"
     if not assets.exists():
+        # exists() follows the link, so a BROKEN assets symlink lands here looking
+        # exactly like an absent directory — and absent is legal. Separate them
+        # first, or a bundle whose assets/ points nowhere audits as "everything is
+        # still to be created" and passes.
+        if assets.is_symlink():
+            raise DiscoveryError(
+                f"{bundle}: assets/ is a symlink that resolves to nothing. Refusing "
+                "to audit as though the directory were simply absent."
+            )
         return set()
 
     root = Path(bundle).resolve()
@@ -140,8 +149,15 @@ def _assets_on_disk(bundle: Path) -> set[str]:
             "would be reported missing against an empty set."
         )
 
+    try:
+        entries = list(resolved.iterdir())
+    except OSError as exc:
+        raise DiscoveryError(
+            f"{bundle}: assets/ could not be listed ({exc})"
+        ) from exc
+
     names: set[str] = set()
-    for entry in resolved.iterdir():
+    for entry in entries:
         try:
             target = entry.resolve()
             target.relative_to(resolved)
@@ -161,6 +177,44 @@ def _assets_on_disk(bundle: Path) -> set[str]:
     return names
 
 
+# The heading that opens the to-be-created table. Anchored, because the filenames
+# in it also appear elsewhere in SOURCES.md as EXISTING sources.
+_CREATE_SECTION = re.compile(r"^#{1,6}\s*assets that must be created", re.M | re.I)
+# A table row declares one file: the first cell, in backticks.
+_CREATE_ROW = re.compile(r"^\|\s*`([^`|]+)`\s*\|", re.M)
+
+
+def _declared_to_create(bundle: Path) -> set[str]:
+    """Filenames SOURCES.md affirmatively declares as still to be created.
+
+    A substring scan of the whole file was wrong in the way that matters: the
+    L1-s1 manifest lists ``img-05.png`` as an EXISTING reference source, so a
+    deleted ``img-05.png`` was classified TO-CREATE — a missing asset reported as
+    planned work. A declaration has to be a row in the to-be-created table, not
+    the filename appearing somewhere in the prose.
+
+    No section means nothing is declared. Those references become DANGLING, which
+    fails the gate; the quiet direction is the one that must not be the default.
+    """
+    manifest = bundle / "SOURCES.md"
+    if not manifest.exists():
+        return set()
+    try:
+        text = manifest.read_text(encoding="utf-8")
+    except (UnicodeError, OSError) as exc:
+        raise DiscoveryError(
+            f"{bundle}: SOURCES.md is not readable as UTF-8 ({exc})"
+        ) from exc
+
+    start = _CREATE_SECTION.search(text)
+    if start is None:
+        return set()
+    rest = text[start.end():]
+    nxt = re.search(r"^#{1,6}\s", rest, re.M)
+    section = rest[: nxt.start()] if nxt else rest
+    return {m.group(1).strip() for m in _CREATE_ROW.finditer(section)}
+
+
 def _audit(
     bundle: Path,
     ref: re.Pattern[str],
@@ -170,11 +224,7 @@ def _audit(
 
     have = _assets_on_disk(bundle)
 
-    manifest = bundle / "SOURCES.md"
-    try:
-        declared = manifest.read_text(encoding="utf-8") if manifest.exists() else ""
-    except (UnicodeError, OSError) as exc:
-        raise DiscoveryError(f"{bundle}: SOURCES.md is not readable as UTF-8 ({exc})") from exc
+    declared = _declared_to_create(bundle)
 
     ok, to_create, dangling = [], [], []
     for r in sorted(refs):

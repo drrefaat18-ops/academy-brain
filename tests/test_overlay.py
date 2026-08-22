@@ -235,11 +235,20 @@ def test_composite_is_idempotent(tmp_path):
 # --------------------------------------------------------------------------
 
 
-def _redaction_only(tmp_path):
-    """A deck as an interrupted run leaves it: marker redacted, image never placed."""
+def _redaction_only(tmp_path, decoys=0):
+    """A deck as an interrupted run leaves it: marker redacted, image never placed.
+
+    ``decoys`` embeds unrelated images first — brand chrome, a mascot — which is
+    what a real deck carries and what defeated the count-based check.
+    """
     deck = _pdf(tmp_path, "[Reserved Image Area: bug-1]")
     doc = fitz.open(str(deck))
     page = doc[0]
+    for n in range(decoys):
+        page.insert_image(
+            fitz.Rect(10 + 30 * n, 10, 35 + 30 * n, 35),
+            filename=str(_png(tmp_path, name=f"decoy-{n}.png")),
+        )
     page.add_redact_annot(page.search_for("[Reserved Image Area: bug-1]")[0])
     page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
     doc.saveIncr()
@@ -317,3 +326,48 @@ def test_legacy_gap_is_caught_in_every_spelling(tmp_path, marker):
     )
     with pytest.raises(gs.HardStop, match="untyped marker"):
         gs.enforce_blueprint_gate(bp)
+
+
+# ---------------------------------------------------------------------------
+# Round 5. The count-based proof was itself a fail-open.
+# ---------------------------------------------------------------------------
+
+
+def test_unrelated_images_do_not_prove_the_asset_was_placed(tmp_path):
+    """C1-5-01. A deck carrying decorative chrome already has embedded images, so
+    an interrupted run that redacted the marker and inserted nothing cleared the
+    old total-count check. Presence must be proven per asset."""
+    deck = _redaction_only(tmp_path, decoys=3)
+
+    assert overlay.find_regions(deck) == []
+    assert sum(overlay.images_on_page(deck).values()) >= 1, "decoys must be present"
+
+    with pytest.raises(overlay.OverlayError, match="nothing records that"):
+        overlay.assert_filled(deck, {"bug-1": _png(tmp_path)})
+
+
+def test_overlay_records_every_id_it_placed(tmp_path):
+    deck = _pdf(tmp_path, "[Reserved Image Area: bug-1]")
+    png = _png(tmp_path)
+
+    assert overlay.overlay(deck, {"bug-1": png}) == ["bug-1"]
+    assert overlay.placed_ids(deck) == {"bug-1"}
+    overlay.assert_filled(deck, {"bug-1": png})  # must not raise
+
+
+def test_asset_gate_rejects_duplicate_ids_across_all_rows(tmp_path):
+    """C1-5-02. The duplicate check lived only in _evidence_map, so a collision
+    between two REFERENCE rows — or across two passes — cleared preflight and was
+    settled by whichever row happened to be parsed last."""
+    png = _png(tmp_path)
+    rows = [
+        gs.Asset(aid="img-05", slide="3", path=png, klass="REFERENCE",
+                 status="produced and mapped"),
+        gs.Asset(aid="IMG-05 ", slide="9", path=png, klass="REFERENCE",
+                 status="produced and mapped"),
+    ]
+
+    with pytest.raises(gs.HardStop, match="duplicate asset id"):
+        gs.enforce_asset_gate(rows)
+
+    assert gs.enforce_asset_gate(rows[:1]) is None

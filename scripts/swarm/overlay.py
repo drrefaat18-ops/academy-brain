@@ -152,6 +152,38 @@ def _find_regions_pdf(deck: Path) -> list[Region]:
     return found
 
 
+# Which asset ids this module actually placed, written into the PDF so the proof
+# survives the process that made it. Counting images cannot do this job: a deck
+# carrying decorative chrome already has images, so an interrupted run that
+# redacted every marker and inserted nothing still cleared a count-based check.
+_PLACED_PREFIX = "swarm-overlay-placed:"
+
+
+def _record_placements(doc, placed: list[str]) -> None:
+    meta = dict(doc.metadata or {})
+    keywords = [k for k in (meta.get("keywords") or "").split() if not k.startswith(_PLACED_PREFIX)]
+    known = _placed_ids_from(meta)
+    keywords.append(_PLACED_PREFIX + ",".join(sorted(known | set(placed))))
+    meta["keywords"] = " ".join(keywords)
+    doc.set_metadata(meta)
+
+
+def _placed_ids_from(meta: dict) -> set[str]:
+    for token in (meta.get("keywords") or "").split():
+        if token.startswith(_PLACED_PREFIX):
+            return {a for a in token[len(_PLACED_PREFIX):].split(",") if a}
+    return set()
+
+
+def placed_ids(deck: Path) -> set[str]:
+    """Asset ids recorded as placed in this PDF by :func:`overlay`."""
+    doc = fitz.open(str(deck))
+    try:
+        return _placed_ids_from(dict(doc.metadata or {}))
+    finally:
+        doc.close()
+
+
 def _overlay_pdf(deck: Path, assets: dict[str, Path], out: Path | None) -> list[str]:
     filled: list[str] = []
     missing: list[str] = []
@@ -203,6 +235,8 @@ def _overlay_pdf(deck: Path, assets: dict[str, Path], out: Path | None) -> list[
                 + ". Resolve this BEFORE generating — redesign, substitute, or drop. "
                 "Do not deliver a deck with an empty box in it."
             )
+
+        _record_placements(doc, filled)
 
         target = Path(out) if out else Path(deck)
         if target == Path(deck):
@@ -294,15 +328,19 @@ def assert_filled(deck: Path, expected: dict[str, Path] | None = None) -> None:
     if not expected or deck.suffix.lower() != ".pdf":
         return
 
-    total = sum(images_on_page(deck).values())
-    if total < len(expected):
+    placed = placed_ids(deck)
+    unproven = sorted(set(expected) - placed)
+    if unproven:
+        total = sum(images_on_page(deck).values())
         raise OverlayError(
-            f"{deck} has no marker left, but carries {total} embedded image(s) for "
-            f"{len(expected)} expected asset(s): {', '.join(sorted(expected))}. "
-            "A deck with the placeholder removed and the picture missing is the "
-            "worst outcome available — it looks finished and is not. Most likely "
-            "an interrupted run applied the redaction and never inserted the image; "
-            "delete the deck and regenerate."
+            f"{deck} has no marker left, but nothing records that "
+            f"{', '.join(unproven)} was ever placed (the deck carries {total} "
+            f"embedded image(s) in total, which proves nothing — chrome and mascots "
+            "are images too). A deck with the placeholder removed and the picture "
+            "missing is the worst outcome available: it looks finished and is not. "
+            "Either an interrupted run applied the redaction and never inserted the "
+            "image, or this deck was never overlaid by this pipeline. Delete it and "
+            "regenerate."
         )
 
 
