@@ -159,29 +159,51 @@ def _find_regions_pdf(deck: Path) -> list[Region]:
 _PLACED_PREFIX = "swarm-overlay-placed:"
 
 
-def _record_placements(doc, placed: list[str]) -> None:
+def _record_placements(doc, placements: dict[str, tuple[int, int]]) -> None:
+    """Record aid=page:xref for each placement, not merely the aid.
+
+    An id alone says an insert once happened. It does not say the image is still
+    there, and a record that outlives what it describes is a claim rather than a
+    proof — the whole defect class this module keeps rediscovering.
+    """
     meta = dict(doc.metadata or {})
-    keywords = [k for k in (meta.get("keywords") or "").split() if not k.startswith(_PLACED_PREFIX)]
-    known = _placed_ids_from(meta)
-    keywords.append(_PLACED_PREFIX + ",".join(sorted(known | set(placed))))
+    keywords = [
+        k for k in (meta.get("keywords") or "").split() if not k.startswith(_PLACED_PREFIX)
+    ]
+    known = dict(_placements_from(meta))
+    known.update(placements)
+    body = ",".join(f"{aid}={pg}:{xref}" for aid, (pg, xref) in sorted(known.items()))
+    keywords.append(_PLACED_PREFIX + body)
     meta["keywords"] = " ".join(keywords)
     doc.set_metadata(meta)
 
 
-def _placed_ids_from(meta: dict) -> set[str]:
+def _placements_from(meta: dict) -> dict[str, tuple[int, int]]:
     for token in (meta.get("keywords") or "").split():
-        if token.startswith(_PLACED_PREFIX):
-            return {a for a in token[len(_PLACED_PREFIX):].split(",") if a}
-    return set()
+        if not token.startswith(_PLACED_PREFIX):
+            continue
+        out: dict[str, tuple[int, int]] = {}
+        for item in token[len(_PLACED_PREFIX):].split(","):
+            aid, _, loc = item.partition("=")
+            page, _, xref = loc.partition(":")
+            if aid and page.isdigit() and xref.isdigit():
+                out[aid] = (int(page), int(xref))
+        return out
+    return {}
+
+
+def placements(deck: Path) -> dict[str, tuple[int, int]]:
+    """asset id -> (1-based page, image xref) as recorded by :func:`overlay`."""
+    doc = fitz.open(str(deck))
+    try:
+        return _placements_from(dict(doc.metadata or {}))
+    finally:
+        doc.close()
 
 
 def placed_ids(deck: Path) -> set[str]:
-    """Asset ids recorded as placed in this PDF by :func:`overlay`."""
-    doc = fitz.open(str(deck))
-    try:
-        return _placed_ids_from(dict(doc.metadata or {}))
-    finally:
-        doc.close()
+    """Asset ids with a placement record. Presence of a record is NOT proof."""
+    return set(placements(deck))
 
 
 def _overlay_pdf(deck: Path, assets: dict[str, Path], out: Path | None) -> list[str]:
@@ -190,6 +212,7 @@ def _overlay_pdf(deck: Path, assets: dict[str, Path], out: Path | None) -> list[
 
     doc = fitz.open(str(deck))
     pending: list[tuple] = []
+    placements: dict[str, tuple[int, int]] = {}
     try:
         for i, page in enumerate(doc, start=1):
             for aid in {a.strip() for a in REGION.findall(page.get_text())}:
@@ -225,7 +248,15 @@ def _overlay_pdf(deck: Path, assets: dict[str, Path], out: Path | None) -> list[
         for page, box, img, aid in pending:
             # keep_proportion is PyMuPDF's aspect-preserving fit — a stretched
             # screenshot of code is a wrong screenshot.
+            before = {x[0] for x in page.get_images(full=True)}
             page.insert_image(box, filename=str(img), keep_proportion=True)
+            new_xrefs = {x[0] for x in page.get_images(full=True)} - before
+            if not new_xrefs:
+                raise OverlayError(
+                    f"page {page.number + 1}: inserting {aid} added no image to the "
+                    "page. Refusing to record a placement that did not happen."
+                )
+            placements[aid] = (page.number + 1, min(new_xrefs))
             filled.append(aid)
 
         if missing:
@@ -236,7 +267,7 @@ def _overlay_pdf(deck: Path, assets: dict[str, Path], out: Path | None) -> list[
                 "Do not deliver a deck with an empty box in it."
             )
 
-        _record_placements(doc, filled)
+        _record_placements(doc, placements)
 
         target = Path(out) if out else Path(deck)
         if target == Path(deck):
@@ -328,19 +359,40 @@ def assert_filled(deck: Path, expected: dict[str, Path] | None = None) -> None:
     if not expected or deck.suffix.lower() != ".pdf":
         return
 
-    placed = placed_ids(deck)
-    unproven = sorted(set(expected) - placed)
-    if unproven:
+    recorded = placements(deck)
+    unrecorded = sorted(set(expected) - set(recorded))
+
+    # A record is a claim about the past. Check the present: the exact image
+    # object each placement named must still be on the page it named. Trusting
+    # the record alone would repeat this module's own defect one level higher —
+    # it was already caught doing that with a marker, and then with a count.
+    doc = fitz.open(str(deck))
+    try:
+        gone = []
+        for aid in sorted(set(expected) & set(recorded)):
+            page_no, xref = recorded[aid]
+            if page_no < 1 or page_no > doc.page_count:
+                gone.append(f"{aid} (recorded on page {page_no}, which does not exist)")
+                continue
+            live = {x[0] for x in doc[page_no - 1].get_images(full=True)}
+            if xref not in live:
+                gone.append(f"{aid} (image {xref} no longer on page {page_no})")
+    finally:
+        doc.close()
+
+    if unrecorded or gone:
         total = sum(images_on_page(deck).values())
+        problems = []
+        if unrecorded:
+            problems.append(f"never recorded as placed: {', '.join(unrecorded)}")
+        if gone:
+            problems.append("recorded but no longer present: " + "; ".join(gone))
         raise OverlayError(
-            f"{deck} has no marker left, but nothing records that "
-            f"{', '.join(unproven)} was ever placed (the deck carries {total} "
-            f"embedded image(s) in total, which proves nothing — chrome and mascots "
-            "are images too). A deck with the placeholder removed and the picture "
-            "missing is the worst outcome available: it looks finished and is not. "
-            "Either an interrupted run applied the redaction and never inserted the "
-            "image, or this deck was never overlaid by this pipeline. Delete it and "
-            "regenerate."
+            f"{deck} has no marker left, but " + "; ".join(problems) + f". The deck "
+            f"carries {total} embedded image(s) in total, which proves nothing — "
+            "chrome and mascots are images too. A deck with the placeholder removed "
+            "and the picture missing is the worst outcome available: it looks "
+            "finished and is not. Delete it and regenerate."
         )
 
 

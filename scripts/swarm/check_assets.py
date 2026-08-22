@@ -198,7 +198,22 @@ def _declared_to_create(bundle: Path) -> set[str]:
     """
     manifest = bundle / "SOURCES.md"
     if not manifest.exists():
+        if manifest.is_symlink():
+            raise DiscoveryError(
+                f"{bundle}: SOURCES.md is a symlink that resolves to nothing."
+            )
         return set()
+
+    root = Path(bundle).resolve()
+    try:
+        resolved = manifest.resolve()
+        resolved.relative_to(root)
+    except (OSError, ValueError) as exc:
+        raise DiscoveryError(
+            f"{bundle}: SOURCES.md resolves outside the bundle ({exc}) — refusing "
+            "to let another bundle declare this one's assets to-be-created"
+        ) from exc
+
     try:
         text = manifest.read_text(encoding="utf-8")
     except (UnicodeError, OSError) as exc:
@@ -264,10 +279,24 @@ def discovery_for(bundle: Path) -> tuple[re.Pattern[str], tuple[str, ...], bool]
     """
     current = Path(bundle).resolve()
     for candidate in (current, *current.parents):
-        if (candidate / MANIFEST_NAME).is_file():
-            course = config.load_course(candidate)
-            d = course.asset_discovery
-            return d.ref, d.source_files, d.expect_references
+        manifest = candidate / MANIFEST_NAME
+        if not manifest.is_file():
+            continue
+        # A manifest symlinked in from outside the candidate directory would let
+        # another course's naming (or expect_references: false) govern this
+        # bundle — the same escape _refs() already closes for source files.
+        try:
+            resolved = manifest.resolve()
+            resolved.relative_to(candidate)
+        except (OSError, ValueError) as exc:
+            raise DiscoveryError(
+                f"{candidate}: {MANIFEST_NAME} resolves outside this directory "
+                f"({exc}) — refusing to govern this bundle with another course's "
+                "manifest"
+            ) from exc
+        course = config.load_course(candidate)
+        d = course.asset_discovery
+        return d.ref, d.source_files, d.expect_references
     raise DiscoveryError(
         f"no {MANIFEST_NAME} found at or above {current}. Asset discovery is "
         "course-specific and has no default; create the manifest rather than "

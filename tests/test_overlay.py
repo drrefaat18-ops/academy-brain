@@ -342,7 +342,7 @@ def test_unrelated_images_do_not_prove_the_asset_was_placed(tmp_path):
     assert overlay.find_regions(deck) == []
     assert sum(overlay.images_on_page(deck).values()) >= 1, "decoys must be present"
 
-    with pytest.raises(overlay.OverlayError, match="nothing records that"):
+    with pytest.raises(overlay.OverlayError, match="never recorded as placed"):
         overlay.assert_filled(deck, {"bug-1": _png(tmp_path)})
 
 
@@ -371,3 +371,30 @@ def test_asset_gate_rejects_duplicate_ids_across_all_rows(tmp_path):
         gs.enforce_asset_gate(rows)
 
     assert gs.enforce_asset_gate(rows[:1]) is None
+
+
+def test_a_placement_record_does_not_survive_the_image_it_describes(tmp_path):
+    """C6, C1 lane. The record is a claim about the past. An id-only record made
+    a deck whose image was stripped afterwards pass — the same defect as the
+    marker and the count, one level up."""
+    deck = _pdf(tmp_path, "[Reserved Image Area: bug-1]")
+    png = _png(tmp_path)
+    overlay.overlay(deck, {"bug-1": png})
+
+    page_no, xref = overlay.placements(deck)["bug-1"]
+    assert (page_no, xref) == (1, xref)
+
+    doc = fitz.open(str(deck))
+    page = doc[page_no - 1]
+    box = page.search_for("bug-1")  # any remaining trace, image itself has no text
+    # Strip the image itself by redacting the whole page area with image removal —
+    # delete_image() leaves the xref listed (as a blanked placeholder), which
+    # would not exercise this check.
+    page.add_redact_annot(page.rect)
+    page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_REMOVE)
+    doc.saveIncr()
+    doc.close()
+
+    assert overlay.placed_ids(deck) == {"bug-1"}, "the record survives, as it would in the wild"
+    with pytest.raises(overlay.OverlayError, match="no longer on page"):
+        overlay.assert_filled(deck, {"bug-1": png})

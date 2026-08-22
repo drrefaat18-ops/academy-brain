@@ -641,3 +641,43 @@ def test_broken_assets_symlink_is_not_an_absent_directory(tmp_path):
 
     with pytest.raises(check_assets.DiscoveryError, match="resolves to nothing"):
         check_assets._assets_on_disk(bundle)
+
+
+# ---------------------------------------------------------------------------
+# Round 6. Two more escapes of the same shape _refs() already closed.
+# ---------------------------------------------------------------------------
+
+
+def test_discovery_refuses_a_course_yaml_symlink_escaping_its_directory(tmp_path):
+    """C6-01. An external manifest could supply another course's naming, or
+    expect_references: false, and the bundle would audit under it silently."""
+    outside = _manifest(tmp_path / "outside")
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    try:
+        (candidate / "course.yaml").symlink_to(outside / "course.yaml")
+    except (OSError, NotImplementedError):
+        pytest.skip("creating symlinks needs privilege on this platform")
+
+    with pytest.raises(check_assets.DiscoveryError, match="resolves outside"):
+        check_assets.discovery_for(candidate / "bundle")
+
+
+def test_sources_md_symlink_escaping_the_bundle_is_refused(tmp_path):
+    """C6-02. A SOURCES.md symlinked from elsewhere could declare this bundle's
+    missing references TO-CREATE and clear expect_references."""
+    bundle = _manifest(tmp_path / "b")
+    (bundle / "slides-source.md").write_text("`img-05.png`\n", encoding="utf-8")
+    (bundle / "home-summary.md").write_text("", encoding="utf-8")
+    outside = tmp_path / "outside.md"
+    outside.write_text(
+        "## Assets that must be CREATED before generation\n\n| `img-05.png` | |",
+        encoding="utf-8",
+    )
+    try:
+        (bundle / "SOURCES.md").symlink_to(outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("creating symlinks needs privilege on this platform")
+
+    with pytest.raises(check_assets.DiscoveryError, match="resolves outside"):
+        check_assets._declared_to_create(bundle)
