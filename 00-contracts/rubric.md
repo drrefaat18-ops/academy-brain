@@ -9,19 +9,22 @@ purpose: >-
   and 30-research/T01-T05.md.
 ---
 
-# JUDGE rubric — L1 sessions
+# JUDGE rubric
+
+Course-neutral. Every anchor below (T01-T05) resolves to the research set of
+the course being judged, not to any one course's documents.
 
 ## 1. Dimensions (from critique `type` enum)
 
 | Dimension | Weight | What "good" looks like | Primary research anchor |
 |---|---|---|---|
-| **pedagogy** | 1.0 | Think→Create→Evaluate→Extend→Share arc intact; one idea/slide; concrete-before-abstract for ages 6-9 | T05 (unit pedagogy) |
-| **technical** | 1.0 | MakeCode block semantics correct (forever/pause/if/on-gesture/pick-random/acceleration); canonical code matches upstream | T04 (block/API reference) |
+| **pedagogy** | 1.0 | Think→Create→Evaluate→Extend→Share arc intact; one idea/slide; concrete-before-abstract for the course's configured age band | T05 (unit pedagogy) |
+| **technical** | 1.0 | The course platform's programming semantics are correct for every construct the slide uses, and the canonical code matches upstream | T04 (the course's block/API reference) |
 | **assessment** | 0.8 | Formative, non-written, embedded in Evaluate/Share (exit ticket, demo, peer-share) — not a bolted-on written test | T02 (assessment design) |
 | **differentiation** | 0.8 | Explicit support/challenge variants re-inserted where R0 `missing[]` flags them dropped | T01 (differentiation) |
 | **other** | 0.5 | Anything real but outside the four buckets above (naming, sequencing, licensing) | — |
 
-Weight scales a dimension's issues before severity multiplies (§2) — technical/pedagogy errors that mislead a 6-9-year-old outrank cosmetic assessment nits.
+Weight scales a dimension's issues before severity multiplies (§2) — technical/pedagogy errors that mislead a child in the target age band outrank cosmetic assessment nits.
 
 ## 2. Severity → action
 
@@ -60,9 +63,9 @@ Unlike 30-research's straight union, JUDGE **adjudicates**:
 
 Per `agent-memory.md` pipeline decisions — these override the scoring math above:
 
-- Technical MakeCode error that would make a student's program not do what the slide claims (e.g. wrong block, wrong parameter semantics per T04).
+- Technical error in the course platform's programming model that would make a student's program not do what the slide claims (wrong block, wrong parameter semantics, wrong port or unit — judged against T04).
 - A session missing `answer_key` where T03 already supplies the canonical answer — patch it in, don't just flag it.
-- A documented misconception left uncorrected (e.g. T03's nightlight/step-counter conflation note for L1-s5).
+- A documented misconception left uncorrected, where T03 already records it for this session.
 - Arabic-language changes are never authored by codex/opencode/hermes lane suggestions — if a lane proposes Arabic text, drop the text, keep the underlying English fix, flag for Claude at 70-localized.
 
 ## 6. Refuter stage (55-refuted, downstream of this rubric)

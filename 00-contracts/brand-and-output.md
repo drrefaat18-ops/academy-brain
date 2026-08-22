@@ -105,8 +105,8 @@ Binding, stated by the academy owner:
 | **s8** | graduation project | **none** — no artifacts generated |
 
 **Every Techno Square session is 120 minutes.** Owner ruling, all courses, all
-levels. The upstream micro:bit decks are built for 60-minute lessons — roughly
-half a session. Content must be expanded to fill 120 minutes with substance, not
+levels. Upstream vendor decks are typically built for
+60-minute lessons — roughly half a session. Content must be expanded to fill 120 minutes with substance, not
 padding. Per the academy's own trainer framework
 (`Think → Build → Test → Debug → Explain`), the added time goes to:
 
@@ -225,8 +225,9 @@ This is a hard boundary — the existing `trainer_boundary` gate enforces it.
 
 ## 7. Interaction law (EthOS v2 addition)
 
-Not in Abdeen's docs; added because the micro:bit upstream decks are video-first
-and the academy is not.
+Not in Abdeen's docs; added because upstream vendor decks tend to be video-first
+and the academy is not. It first bit on the micro:bit source decks; it is a
+standing law for every course, not a patch for that one.
 
 A slide whose only content is a video link is a **defect**. Every such slide is
 replaced by a hands-on beat: predict -> try -> check, a build step, or a

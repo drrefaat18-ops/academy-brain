@@ -4,7 +4,7 @@ level: "<L1>"
 session: "<s1>"
 status: draft-awaiting-owner-approval
 last_updated: YYYY-MM-DD
-track: kids-microbit
+track: "<course track slug, e.g. kids-microbit / kids-ev3>"
 age_band: "UNCONFIRMED - owner must fill"
 duration_minutes: 120
 ---
@@ -20,7 +20,7 @@ duration_minutes: 120
 
 | Field | Value |
 |---|---|
-| Track | Techno Square micro:bit kids track |
+| Track | `<Techno Square + course + audience, e.g. "Techno Square EV3 kids track">` |
 | Age band | `UNCONFIRMED - owner must fill` |
 | Duration | 120 minutes |
 | Session role | `<teaching / revision / graduation project>` |
