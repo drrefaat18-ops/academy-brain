@@ -55,11 +55,6 @@ class DiscoveryError(ValueError):
     """Discovery could not be resolved. Never defaulted around."""
 
 
-
-class DiscoveryError(ValueError):
-    """Discovery could not be resolved. Never defaulted around."""
-
-
 REF = re.compile(r"`((?:img|tata|technosquare)[A-Za-z0-9_.\-]*\.(?:png|gif|jpg|jpeg))`")
 SOURCE_FILES = ("slides-source.md", "home-summary.md")
 
@@ -74,8 +69,20 @@ def _refs(
     """Filenames referenced by the bundle's source files (containment: see docstring)."""
     refs: set[str] = set()
     missing = []
+    root = Path(bundle).resolve()
     for name in source_files:
         f = bundle / name
+        # Lexical containment is not containment: a symlink inside the bundle
+        # can point at another course's deck, and auditing that one reports PASS
+        # on this one. Resolve first, then prove the result is still inside.
+        try:
+            resolved = f.resolve()
+            resolved.relative_to(root)
+        except (OSError, ValueError) as exc:
+            raise DiscoveryError(
+                f"{bundle}: source file {name!r} resolves outside the bundle "
+                f"({exc}) — refusing to audit another course's files"
+            ) from exc
         if not f.is_file():
             # A typo'd source file used to be skipped, turning the whole audit
             # into an empty pass. Absence is a configuration error, not a hint.
@@ -181,6 +188,23 @@ def main(argv: list[str]) -> int:
     if dangling:
         print(f"\nFAIL: {len(dangling)} dangling asset reference(s)")
         return 1
+
+    # A pattern can compile, carry exactly one capture group, and still match
+    # nothing — schema validation cannot tell a working pattern from a typo'd
+    # one. The observable signature of that mistake is "no references found
+    # anywhere, yet the assets directory is full", so treat it as the
+    # misconfiguration it almost always is. A genuinely empty bundle has nothing
+    # on disk either and still passes; a bundle whose assets nothing references
+    # is a defect in its own right.
+    if not (ok or to_create) and unused_now:
+        print(
+            f"\nFAIL: discovery matched no references at all, yet "
+            f"{len(unused_now)} file(s) sit in assets/. The configured "
+            f"asset_ref_pattern or asset_source_files almost certainly do not "
+            f"match this course."
+        )
+        return 1
+
     print(f"\nPASS: {len(ok)} present, {len(to_create)} to create")
     return 0
 

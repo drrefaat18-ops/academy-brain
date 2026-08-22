@@ -12,6 +12,7 @@ they assert a nonzero exit where an earlier version asserted a green pass.
 """
 
 import re
+from pathlib import Path
 
 import pytest
 
@@ -409,3 +410,66 @@ def test_to_create_reference_declared_in_sources_md(tmp_path):
     ok, to_create, dangling = check_assets.audit(b)
     assert to_create == ["img-later.png"]
     assert dangling == []
+
+
+# --------------------------------------------------------------------------
+# review iteration 3: three more ways to reach a green gate on an empty check
+# --------------------------------------------------------------------------
+
+
+def test_pattern_that_matches_nothing_fails_closed(tmp_path, capsys):
+    """C0-12. A regex can compile, carry one group, and still match nothing.
+
+    Schema validation cannot tell that from a working pattern; the observable
+    signature is 'no references at all, yet assets/ is full'.
+    """
+    root = _manifest(
+        tmp_path / "nomatch",
+        "asset_discovery:\n  asset_ref_pattern: '((?!))'\n  asset_source_files: [deck.md]\n",
+    )
+    b = root / "b1"
+    (b / "assets").mkdir(parents=True)
+    (b / "assets" / "shot-arm.png").write_bytes(b"x")
+    (b / "deck.md").write_text("`shot-missing.png`\n", encoding="utf-8")
+
+    rc = check_assets.main(["check_assets.py", str(b)])
+    assert rc == 1
+    assert "matched no references at all" in capsys.readouterr().out
+
+
+def test_empty_bundle_with_empty_assets_still_passes(tmp_path):
+    """The counterpart: nothing referenced AND nothing on disk is a real pass.
+
+    Guards the C0-12 fix against over-reach — it must catch misconfiguration,
+    not every early-stage bundle.
+    """
+    root = _manifest(tmp_path)
+    b = _bare_bundle(root)
+    assert check_assets.main(["check_assets.py", str(b)]) == 0
+
+
+def test_symlinked_source_escaping_the_bundle_is_refused(tmp_path):
+    """C0-11. Lexical containment is not containment.
+
+    A symlink inside the bundle can point at another course's deck; auditing
+    that one reports PASS on this one.
+    """
+    outside = tmp_path / "other"
+    outside.mkdir()
+    (outside / "deck.md").write_text("nothing here\n", encoding="utf-8")
+
+    b = tmp_path / "b"
+    (b / "assets").mkdir(parents=True)
+    try:
+        (b / "deck.md").symlink_to(outside / "deck.md")
+    except (OSError, NotImplementedError) as exc:  # Windows without the privilege
+        pytest.skip(f"symlinks unavailable: {exc}")
+
+    with pytest.raises(check_assets.DiscoveryError, match="outside the bundle"):
+        check_assets._refs(b, check_assets.REF, ("deck.md",))
+
+
+def test_discovery_error_is_declared_once():
+    """C0-14. A botched patch left two identical class statements."""
+    source = Path(check_assets.__file__).read_text(encoding="utf-8")
+    assert source.count("class DiscoveryError") == 1

@@ -21,7 +21,12 @@ status: awaiting_content          # flips to `active` when EV3 material arrives
 # docs/PLAN-academy-template-and-ev3.md. Until H lands, treat every rule here as a
 # discipline being followed by hand, and never report it as a check that passed.
 enforcement_status:
-  parses_as_yaml: enforced
+  # Parsing SUCCEEDS, but nothing enforces that it keeps succeeding: no gate, no
+  # CI step and no test reads this directory. "Someone ran yaml.safe_load once"
+  # is manual verification, not enforcement, and reporting it as enforcement is
+  # the dishonesty this block exists to remove.
+  parses_as_yaml: NOT_ENFORCED
+  parses_as_yaml_note: "verified by hand 2026-08-22; automate in lane H"
   every_other_rule_in_this_file: NOT_ENFORCED
   tracked_as: "lane H"
 
@@ -84,9 +89,23 @@ claim_card:
     status:        "one of status_values"
     applicability: "which kit / firmware / software version this holds for"
     confidence:    "one of confidence_values"
-  required_when_sourced:
-    source_id: "must resolve in source-catalog.yaml"
-    locator:   "page, section, timestamp, or part number. 'see docs' is not a locator."
+  # D3-04: stated per status so the prose files cannot drift into their own
+  # readings. A REFUTED claim MUST keep the source that refuted it — an earlier
+  # draft forced both fields to null for every non-SOURCED status, which threw
+  # away the evidence.
+  fields_by_status:
+    SOURCED:
+      source_id: required   # must resolve in source-catalog.yaml
+      locator:   required   # page, section, timestamp, or part number. "see docs" is not a locator.
+    REFUTED:
+      source_id: required   # the source that contradicts the claim
+      locator:   required   # where in that source
+    UNVERIFIED:
+      source_id: optional   # present when a source exists but applicability is unconfirmed
+      locator:   "required when source_id is present, else null"
+    NEEDS_SOURCING:
+      source_id: null       # by definition there is none
+      locator:   null
   forbidden:
     - "a claim whose only support is model knowledge"
     - "a claim that infers a part, port, block, limit, compatibility, or behaviour"
@@ -321,7 +340,29 @@ approval_record:
     - "kind: specialist_council with specialist == reviewer is invalid regardless of verdict"
     - "a high-severity call with no refuter is invalid"
 
+# D3-02: the enclosing receipt shape. The agent file previously invented this
+# envelope because the schema never defined one, so "the files agree exactly"
+# could not be true of anything.
+specialist_receipt:
+  path: "90-receipts/<session>.ev3-specialist.yaml"
+  required:
+    session:    "session id"
+    specialist: "always ev3"
+    verdict:    "APPROVED | BLOCKED — ONE verdict for the run. There is no per-claim verdict; a claim carries status, not a verdict."
+    claims:     "list of claim_card records"
+    holes:      "list of what is missing and what would settle each one"
+  optional:
+    approval_record: "one approval_record, when the run made a routed decision"
+    review_receipt:  "LIST of review_receipt records — a run can carry a reviewer pass and a refuter pass"
+  validation:
+    # D3-05: UNVERIFIED is a non-shipping status per status_values above, so a
+    # run carrying a required UNVERIFIED claim must not report APPROVED.
+    - "verdict APPROVED is invalid if any required claim has status NEEDS_SOURCING, REFUTED, or UNVERIFIED"
+    - "review_receipt is a list, never a bare mapping"
+  status: NOT_ENFORCED
+
 review_receipt:
+  cardinality: "specialist_receipt.review_receipt holds a LIST of these records"
   required:
     subject_id: "what was reviewed"
     actor:      "who reviewed — must differ from the producer"

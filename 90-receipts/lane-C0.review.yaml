@@ -2,7 +2,7 @@ step: C0
 builder: opencode (iterations 1-2), claude (iteration 3 — see scope note)
 reviewer: codex
 date: 2026-08-22
-iteration: 3
+iteration: 4
 verdict: BLOCKED at iteration 2; fixes applied, awaiting re-review
 graduation: NOT GRANTED
 
@@ -108,3 +108,62 @@ graduation_note: >
   conditions, and its own tests asserted that failure as correct behaviour. A builder
   whose tests bless the defect the lane exists to prevent does not get shared
   infrastructure. Revisit on a lane where the brief is not defective.
+
+# ---------------------------------------------------------------------------
+# Iteration 3 review — codex ran probes this time (confirmed non-capturing and
+# named groups are accepted, and that '((?!))' has one group and matches
+# nothing). Still BLOCKED: 3 real, 1 not reproduced.
+# ---------------------------------------------------------------------------
+
+iteration_3:
+  verdict: BLOCKED
+  reviewer_ran: "python probes yes; pytest no (read-only sandbox has no temp dir)"
+  findings:
+    - id: C0-11
+      severity: high
+      result: ACCEPTED
+      problem: containment was lexical only; a symlink inside the bundle escapes it.
+      fix: >
+        _refs() resolves each source file and requires the resolved path to stay
+        under the resolved bundle. Regression test added; it skips on Windows
+        hosts without the symlink privilege, which is this machine.
+    - id: C0-12
+      severity: high
+      result: ACCEPTED
+      problem: >
+        a regex can compile, carry exactly one capture group, and still match
+        nothing. Schema validation cannot tell that from a working pattern, so a
+        typo'd pattern reached PASS with zero references.
+      fix: >
+        Zero references found while assets/ is non-empty is now a FAIL naming
+        misconfiguration as the cause. Deliberately NOT a new config knob: the
+        signature of the mistake is already observable. A genuinely empty bundle
+        has nothing on disk either and still passes — covered by its own test so
+        the rule cannot over-reach.
+    - id: C0-13
+      severity: high
+      result: NOT REPRODUCED (specific claim), PARTLY ACCEPTED (general point)
+      evidence: >
+        The reviewer stated tests/test_paths.py:7 ALTERNATIVE_CONFIG lacks
+        asset_discovery and therefore fails. It carries the section and
+        tests/test_paths.py passes 21/21. The reviewer appears to have read a
+        pre-fix snapshot.
+      accepted_part: >
+        The migration hazard itself is real: asset_discovery is required, and
+        paths.for_root() calls load_course before constructing anything, so any
+        manifest without the section breaks at import. Verified the failure is
+        actionable rather than cryptic: "course.yaml: missing field(s):
+        asset_discovery". The repo has exactly one manifest and it is migrated.
+        Lane E must create the EV3 manifest with the section present.
+    - id: C0-14
+      severity: low
+      result: CONFIRMED — builder's own defect
+      evidence: "grep -n 'class DiscoveryError' returned lines 54 and 59."
+      cause: >
+        A botched string replacement during the claude integration pass left two
+        identical class statements. Caught by review, not by the suite — a test
+        now asserts the class is declared exactly once.
+
+verification_iteration_3:
+  suite: "164 passed, 1 skipped (symlink test skips without the Windows privilege)"
+  scenarios: "C0-12 never-matching pattern -> exit 1; empty bundle -> exit 0; real bundle unchanged at 21 present, 1 to create"

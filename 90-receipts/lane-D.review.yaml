@@ -2,7 +2,7 @@ step: D
 builder: claude
 reviewer: codex
 date: 2026-08-22
-iteration: 2
+iteration: 3
 verdict: BLOCKED
 blocking: 16
 advisory: 2
@@ -207,3 +207,50 @@ iteration_2:
     wrong and silently became a tier name. A reviewer who re-parses rather than
     re-reads is the only thing that catches that, and it is a direct argument for
     verifying fixes by execution rather than by diff.
+
+# ---------------------------------------------------------------------------
+# Iteration 3 — BLOCKED, 5 findings, all accepted. One root cause.
+# ---------------------------------------------------------------------------
+
+iteration_3:
+  verdict: BLOCKED
+  blocking: 5
+  root_cause: >
+    The schema never defined a receipt ENVELOPE. The agent file had to invent one
+    to be useful, and an invented shape cannot "match the canonical schema
+    exactly" — so iteration 2's claim of exact agreement was unfalsifiable rather
+    than true. Four of the five findings follow from that hole.
+  fixes_applied:
+    - finding: D3-01
+      action: >
+        parses_as_yaml changed from "enforced" to NOT_ENFORCED, with a separate
+        note recording that it was verified by hand. It contradicted the two
+        honesty blocks sitting directly above and below it.
+    - finding: D3-02
+      action: >
+        specialist_receipt added to the schema as the canonical envelope, with
+        review_receipt explicitly a LIST (a run can carry a reviewer pass and a
+        refuter pass). The agent file now points at it as canonical.
+    - finding: D3-03
+      action: >
+        "a verdict per claim" corrected to one verdict for the run plus a status
+        per claim. There is no per-claim verdict anywhere in the model.
+    - finding: D3-04
+      action: >
+        claim_card.fields_by_status added, stating source_id and locator per
+        status. The important correction: a REFUTED claim MUST keep the source
+        and locator that refuted it. The previous draft forced both to null for
+        every non-SOURCED status, which discarded the refuting evidence.
+    - finding: D3-05
+      action: >
+        UNVERIFIED added to the blocking rule in both the schema validation and
+        the agent file. UNVERIFIED means sourced-but-unconfirmed-for-our-kit, or
+        a physical claim with no observation receipt; approving on one ships
+        content nobody checked.
+  verification: >
+    Schema re-parsed; the agent's receipt block re-parsed and asserted to be a
+    list at review_receipt; envelope required-fields checked field-by-field
+    against the agent example; both enforcement statements checked to agree.
+  reviewer_quality_note: >
+    Third useful review. D3-04 is the standout: the builder's own "fix" for
+    finding 5 had quietly made REFUTED claims unable to cite what refuted them.

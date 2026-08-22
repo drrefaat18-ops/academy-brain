@@ -90,8 +90,13 @@ verdict: APPROVED | BLOCKED
 claims:
   - claim: <statement>
     status: SOURCED | NEEDS_SOURCING | UNVERIFIED | REFUTED
-    source_id: "<required when SOURCED, else null>"
-    locator: "<required when SOURCED, else null>"
+    # per knowledge/ev3/intake-schema.yaml claim_card.fields_by_status:
+    #   SOURCED   -> both required
+    #   REFUTED   -> both required (keep the source that refuted it)
+    #   UNVERIFIED-> source_id optional; locator required if source_id present
+    #   NEEDS_SOURCING -> both null
+    source_id: "<see fields_by_status>"
+    locator: "<see fields_by_status>"
     applicability: <which kit/firmware/software — never omitted>
     confidence: high | medium | low
 # approval_record and review_receipt are the canonical structures from
@@ -123,4 +128,15 @@ The claim shape here must match `knowledge/ev3/intake-schema.yaml` exactly. That
 file is canonical; if this block and the schema disagree, the schema wins and the
 disagreement is a defect to report, not a choice to make.
 
-`BLOCKED` if any claim required by the target is `NEEDS_SOURCING` or `REFUTED`.
+`BLOCKED` if any claim required by the target is `NEEDS_SOURCING`, `REFUTED`, or
+`UNVERIFIED`. `UNVERIFIED` is a non-shipping status — it means sourced but
+unconfirmed for our kit, or a physical claim with no observation receipt — so
+approving a run that rests on one ships content nobody has checked.
+
+There is exactly ONE verdict, for the run. A claim carries `status`, never its
+own verdict. `review_receipt` is a LIST: a run can carry both a reviewer pass
+and a refuter pass.
+
+This envelope is `specialist_receipt` in `knowledge/ev3/intake-schema.yaml`.
+That file is canonical; if this block and the schema disagree, the schema wins
+and the disagreement is a defect to report, not a choice to make.

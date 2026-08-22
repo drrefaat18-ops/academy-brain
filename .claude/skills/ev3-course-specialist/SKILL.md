@@ -55,10 +55,12 @@ applicability: <which kit/firmware/software this holds for>
 confidence: high | medium | low
 ```
 
-A `SOURCED` claim without `locator` is not a claim. `NEEDS_SOURCING`,
-`UNVERIFIED` and `REFUTED` claims carry `locator: null` — that is the
-canonical schema's own shape, and demanding a locator there only invites
-an invented one.
+A `SOURCED` claim without `locator` is not a claim. For every other status the
+rule is set by `claim_card.fields_by_status` in
+`knowledge/ev3/intake-schema.yaml`, and it is not "always null": a `REFUTED`
+claim MUST keep the `source_id` and `locator` that refuted it, or the evidence
+is thrown away. `NEEDS_SOURCING` carries null for both. `UNVERIFIED` may carry
+a source, and must carry a locator if it does.
 
 **This rule is NOT machine-enforced yet.** `scripts/swarm/gates/cite_filter.py` is the
 nearest existing mechanism, but it reads critique JSON (`issues[].cites`) and does not
@@ -194,7 +196,7 @@ against those slots.
 | `60-approved/<session>.technical.yaml` | approved technical decisions |
 | `75-bundle/<session>/technical-decision-record.md` | why each call was made |
 | `75-bundle/<session>/ASSET-MAPPING.md` | the technical portion |
-| `90-receipts/<session>.ev3-specialist.yaml` | a verdict per claim |
+| `90-receipts/<session>.ev3-specialist.yaml` | one verdict for the run, and a `status` per claim (never a per-claim verdict) |
 
 ## 7. QA checklist — refuse to emit until all hold
 

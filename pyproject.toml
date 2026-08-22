@@ -12,7 +12,10 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.0"]
+# Pillow generates the real PNG fixtures the overlay tests need: python-pptx
+# embeds image bytes without decoding them, so a hand-rolled byte string
+# passes the PPTX path and fails only under MuPDF — which is the production one.
+dev = ["pytest>=8.0", "pillow>=10.0"]
 
 [tool.pytest.ini_options]
 pythonpath = ["scripts"]
