@@ -338,6 +338,19 @@ Also preserve the *process* that caught them: render every PDF to frames, inspec
   turn on "do we own this part, in this quantity" therefore stay `UNVERIFIED`
   with their source kept — they are sourced, just not confirmed for our kit. No
   other claim is blocked, and nothing is routed to the owner on this basis.
+
+  **Owner ruling, 2026-08-23: the content PDF is ceiling, not floor.**
+  `EV3 source/LV 1/EV3-L1_Source-Material_v1.0.pdf` is the exact truth for what
+  this course teaches — the robot, the code, the images, the lesson content.
+  Agents scope their claims, digest, and generation to what this PDF actually
+  contains. They do not invent additional scope, harder objectives, extra
+  builds, or "more complete" content beyond it in the name of thoroughness or
+  creativity. A gap between what the PDF covers and what a more ambitious
+  course might cover is not a defect to fix — it is the syllabus. The owner
+  will resolve any real content question directly; agents must not manufacture
+  blocking findings out of the PDF being narrower than some hypothetical ideal
+  course. `EV3-L1_Trainer-Guide_v1.0.pdf` (same directory) is the paired
+  trainer-facing draft and carries the same ceiling rule.
 - **G** — One pilot session end-to-end through gates before scaling.
 - **H** — *(opened 2026-08-22 by codex's review of lane D)* Build the EV3 validators the
   doctrine currently only promises: claim-card schema validation and source resolution,
@@ -606,3 +619,48 @@ need no inventory answer. Only G needs both sourced facts and physical inventory
    identifying-label photographs. Agents interpret them; the owner is not asked to
    identify compatibility, choose software, or make robotics judgments.
 4. Whatever is settled is written into `course.yaml`, which is what steps E–G read.
+
+---
+
+## Future project — parked until EV3 course is done and stable
+
+**Multi-course reuse porting pass.** Owner asked (2026-08-22) whether this vault is
+ready to host another Techno Square course. Dispatched codex and opencode
+independently for a read-only audit; both converged. Verdict: ~80% ready. The
+manifest/scaffold/asset-gate core (`config.py`, `paths.py`, `check_assets.py` CLI,
+`new_course.py`, `gate_runner.py`, `envelope.py`, `overlay.py`) is genuinely
+course-agnostic and tested. Scoped to another *Techno Square* course (not a
+foreign academy), the fixed Techno Square branding / 70% Arabic / 120-minute
+session assumptions in `brand-and-output.md` and `_TEMPLATE-blueprint.md` are
+correct defaults, not bugs.
+
+Remaining ~20%, when this becomes active work:
+
+1. `generate_session.py` is hardcoded to this course: absolute external path
+   (`D:\vault\GPT_Behavior_Deconstruction_Vault\...`), notebook titles literally
+   say "TechnoSquare microbit", forced `ar` output, and bundle filenames
+   (`slides-source.md`, `trainer-guide.md`, etc.) are hardcoded instead of read
+   from `asset_discovery.source_files` — a course declaring different source
+   files passes `check_assets` then dies in preflight. Needs to read these from
+   `course.yaml` instead.
+2. `new_course.SCAFFOLD_DIRS` only copies `scripts/` and `tests/` — a scaffolded
+   course gets **no** `.claude/` directory, no doctrine skill, no agent
+   definitions, no `knowledge/<domain>/` schema, and critically no
+   `00-contracts/agent-memory.md` (carries the owner-never-touches-agent-resolvable-defects
+   rule). Every new course currently has to hand-author these from scratch.
+3. `.claude/agents/ev3-specialist.md` is ~85% generic scaffolding (role,
+   read/write envelope, verdict/approval/review-receipt structure) and
+   `.claude/skills/ev3-course-specialist/SKILL.md` is roughly half generic
+   (citation discipline, ownership routing, no-Arabic rule, QA skeleton) / half
+   EV3-specific (source hierarchy, physical-build seeded bugs, physical-evidence
+   asset class). Porting to a new domain = copy + rename + swap the
+   domain-specific half, not a rewrite.
+4. Two smaller latent bugs found in the audit: `check_assets.py`'s module-level
+   `audit()`/`unused()` API still defaults to micro:bit regex/naming (only the
+   CLI path is manifest-driven); and `scaffold_vault.py` writes a second
+   `00-contracts/topology.md` with hardcoded providers that can disagree with
+   `new_course.py`'s manifest-derived root `topology.md`.
+
+Estimated effort: roughly a day of focused porting work, not a redesign. Do not
+start until the EV3 course (this plan) reaches G/H and is stable — porting
+against a second real course, not a guess, is what makes the abstraction trustworthy.
