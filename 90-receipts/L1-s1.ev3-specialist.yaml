@@ -1,0 +1,207 @@
+# 90-receipts/L1-s1.ev3-specialist.yaml
+#
+# Shape: intake-schema.yaml specialist_receipt (canonical).
+# Scope: session L1-s1 ONLY. Owner ruling 2026-08-23 applies: the content PDF is
+# the exact scope ceiling. Nothing below asks for content the PDF does not state;
+# holes are internal ambiguities or unresolved applicability, never "this course
+# should teach more".
+#
+# Text extracted 2026-08-23 with PyMuPDF (pdftotext -layout drops the Arabic).
+# Source Material S1 = PDF pages 1-4 (0-indexed 0-3). Trainer Guide S1 = pages
+# 1-3 (0-indexed 0-2). Locators below use 1-based page numbers.
+
+session: L1-s1
+specialist: ev3
+verdict: BLOCKED
+
+claims:
+  - claim: "Session 1 is titled 'Meet EV3 & Bevel Bot', runs 120 minutes, and uses the robot 'Bevel Bot'."
+    status: SOURCED
+    source_id: ev3-l1-source-material-v1
+    locator: "p.1, heading 'Session 1 — Meet EV3 & Bevel Bot' / 'Duration: 120 minutes | Robot: Bevel Bot (24 build steps)'"
+    applicability: "this course's L1 syllabus; kit/software/firmware not stated in the document"
+    confidence: high
+    severity: low
+
+  - claim: "Session 1's stated main focus is: EV3 Hub, ports, connection, motors, wheel diameter, gear ratio."
+    status: SOURCED
+    source_id: ev3-l1-source-material-v1
+    locator: "p.1, 'Main Focus: EV3 Hub, ports, connection, motors, wheel diameter, gear ratio'"
+    applicability: "this course's L1 syllabus"
+    confidence: high
+    severity: low
+
+  - claim: "Session 1's Key Concepts list is exactly: Hub inputs/outputs; Bluetooth/Wi-Fi connection; Motor direction; speed; rotations; wheel diameter; gear ratio; variables; display."
+    status: SOURCED
+    source_id: ev3-l1-source-material-v1
+    locator: "p.1, 'Key Concepts' block"
+    applicability: "this course's L1 syllabus"
+    confidence: high
+    severity: low
+
+  - claim: "The Session 1 Code Map is: set wheel diameter = 3; set gear ratio = 20 ÷ 12; geared rotations = 100 ÷ (wheel diameter × 3.14 × gear ratio); Motor A speed 100%; reset degrees counted; run counterclockwise for geared rotations; display calculated and actual rotations."
+    status: SOURCED
+    source_id: ev3-l1-source-material-v1
+    locator: "p.3, 'Code Map' block"
+    applicability: "this course's L1 syllabus; block set / software version not stated"
+    confidence: high
+    severity: medium
+
+  - claim: "The Trainer Guide's Session 1 'Code / Mechanism Reference' is word-for-word identical to the Source Material Code Map — the two documents do not disagree on the S1 program."
+    status: SOURCED
+    source_id: ev3-l1-trainer-guide-v1
+    locator: "p.2, 'Code / Mechanism Reference'; compare ev3-l1-source-material-v1 p.3 'Code Map'"
+    applicability: "this course's L1 syllabus"
+    confidence: high
+    severity: low
+
+  - claim: "Session 1's stated Common Problems to Investigate are: wrong port A; incorrect wheel diameter; reversed direction; forgetting to reset degrees counted."
+    status: SOURCED
+    source_id: ev3-l1-source-material-v1
+    locator: "p.4, 'Common Problems to Investigate'; identical list at ev3-l1-trainer-guide-v1 p.3 'Common Bugs & Trainer Response'"
+    applicability: "this course's L1 syllabus; scope of the statement is the four listed items as printed — this asserts nothing about whether other items may exist"
+    confidence: high
+    severity: medium
+
+  - claim: "Session 1's student challenge is: change the required distance or the motor speed, and predict the result before running."
+    status: SOURCED
+    source_id: ev3-l1-source-material-v1
+    locator: "p.4, 'Student Challenge'; same text at ev3-l1-trainer-guide-v1 p.2 'Challenge'"
+    applicability: "this course's L1 syllabus"
+    confidence: high
+    severity: low
+
+  - claim: "Session 1's Quick Check is four questions: what is the Input; what decision/operation the code performs; what Output is expected; what you would check first if the result is wrong."
+    status: SOURCED
+    source_id: ev3-l1-source-material-v1
+    locator: "p.4, 'Quick Check' bullets"
+    applicability: "this course's L1 syllabus"
+    confidence: high
+    severity: low
+
+  - claim: "The Session 1 trainer timeline is six fixed blocks: 00:00–00:10 welcome/recap/mission; 00:10–00:30 concept demo and prediction; 00:30–01:00 robot/build inspection or construction; 01:00–01:30 code walkthrough and guided implementation; 01:30–01:50 testing, debugging and challenge; 01:50–02:00 explain, exit ticket, save and cleanup."
+    status: SOURCED
+    source_id: ev3-l1-trainer-guide-v1
+    locator: "p.2, 'Time / Trainer Flow' table"
+    applicability: "this course's L1 syllabus; the same table repeats verbatim for S2, so it is a level-wide template, not S1-specific"
+    confidence: high
+    severity: low
+
+  - claim: "The course's stated learner age band is 11–13."
+    status: SOURCED
+    source_id: ev3-l1-source-material-v1
+    locator: "p.1 cover line, '8 Sessions × 120 Minutes | Ages 11–13 | Version 1.0'; identical on ev3-l1-trainer-guide-v1 p.1"
+    applicability: "the whole L1 course, therefore L1-s1"
+    confidence: high
+    severity: high
+
+  - claim: "The S1 Code Map's numeric values ('wheel diameter = 3', the '100' in 'geared rotations = 100 ÷ (…)') carry no stated unit anywhere in the S1 text — verified by direct text search of both PDFs this run."
+    status: SOURCED
+    source_id: ev3-l1-source-material-v1
+    locator: "p.3, 'Code Map' ('Set wheel diameter = 3', 'geared rotations = 100 ÷ (…)'); no unit is stated for these specific values anywhere in the S1 text ('Movement Units' appears on pp.1/4 as a section heading, not as a unit attached to these numbers)"
+    applicability: "the S1 program text as written"
+    confidence: high
+    severity: medium
+
+  - claim: "The intended unit for the S1 Code Map's numeric values is unknown."
+    status: NEEDS_SOURCING
+    source_id: null
+    locator: null
+    applicability: "the S1 program; a unit would have to come from an author ruling or the original program file — none is named in either document"
+    confidence: low
+    severity: high
+
+  - claim: "The S1 Code Map states 'Set gear ratio = 20 ÷ 12' and nothing more: the S1 text (pp.1-4 of both PDFs) specifies no gear (no tooth counts, no part numbers, no gear naming) — verified by direct text search this run, the only 'tooth' hits in either PDF being inside the word 'Bluetooth'. Gear naming does appear elsewhere in the documents (outside S1 scope), so this claim is scoped to the S1 pages only."
+    status: SOURCED
+    source_id: ev3-l1-source-material-v1
+    locator: "p.3, 'Code Map' ('Set gear ratio = 20 ÷ 12'); no gear specification on the S1 pages (pp.1-4) of ev3-l1-source-material-v1 or ev3-l1-trainer-guide-v1"
+    applicability: "the S1 program text as written; what physical gearing produces this ratio is not a document fact and is not asserted here"
+    confidence: high
+    severity: medium
+
+  - claim: "Bevel Bot is built in 24 steps."
+    status: UNVERIFIED
+    source_id: ev3-l1-source-material-v1
+    locator: "p.1, 'Robot: Bevel Bot (24 build steps)' — the count is asserted, but no step sequence appears on the S1 pages (pp.1–4 carry exactly two images: a ~341×357 robot image on p.2 and an ~867×662 code image on p.3)"
+    applicability: "the S1 build; cannot be confirmed without the build instructions the document references but does not contain"
+    confidence: medium
+    severity: high
+
+  - claim: "The programming environment and version in which the S1 Code Map is authored is not named anywhere in either document — verified by direct text search this run (no hit for any known EV3 environment name or version marker)."
+    status: SOURCED
+    source_id: ev3-l1-source-material-v1
+    locator: "p.3, 'Code Map' block; no environment/version name appears on any page of ev3-l1-source-material-v1 or ev3-l1-trainer-guide-v1"
+    applicability: "every S1 code artifact, every S1 block reference, and the wording of the four stated S1 bugs"
+    confidence: high
+    severity: medium
+
+  - claim: "The intended programming environment and version for the S1 Code Map is unknown."
+    status: NEEDS_SOURCING
+    source_id: null
+    locator: null
+    applicability: "every S1 code artifact, every S1 block reference, and the wording of the four stated S1 bugs"
+    confidence: low
+    severity: high
+
+  - claim: "No motor port other than A is named in the S1 text."
+    status: SOURCED
+    source_id: ev3-l1-source-material-v1
+    locator: "p.3 Code Map ('Set Motor A speed to 100%') and p.4 Common Problems ('Wrong port A') — no other port is named in S1"
+    applicability: "closed reading of the S1 text only — no motor port other than A is named anywhere in the S1 pages. This is NOT a claim that the physical build has only one usable motor port, nor that no other port is wired; port hardware is a kit question the document does not answer."
+    confidence: high
+    severity: medium
+
+  - claim: "Session 1 connects to the Hub over Bluetooth/Wi-Fi, per the stated Key Concepts."
+    status: UNVERIFIED
+    source_id: ev3-l1-source-material-v1
+    locator: "p.1, Key Concepts ('Bluetooth/Wi-Fi connection')"
+    applicability: "the document lists 'Bluetooth/Wi-Fi connection' as a Key Concept and says nothing further about how connection is made; unconfirmed against the academy's hardware because physical-inventory.yaml does not exist (known_unknown ev3-academy-kit-identity)"
+    confidence: low
+    severity: high
+
+holes:
+  - "S1 measurement units. 'wheel diameter = 3' and the '100' in 'geared rotations = 100 ÷ (…)' carry no unit anywhere in either PDF — independently confirmed by direct text extraction this run, matching the prior codex/opencode reads. Settled by: an author ruling from Abdeen, or the original program file the Code Map was transcribed from. Blocks: any slide, worksheet, or trainer line that states a distance."
+  - "Bevel Bot build steps. Both PDFs assert '24 build steps' but neither contains a step sequence; S1 carries only two images (robot, code). Settled by: the build instruction source those 24 steps come from, catalogued as its own source_entry with a procedural_sequence record. Blocks: the 00:30–01:00 build block and any PROCEDURAL_SEQUENCE asset for S1."
+  - "Programming environment. Neither PDF names the software or version, so block names in the Code Map cannot be rendered exactly. Standing known_unknown ev3-software-environment, routed specialist_council. Blocks: all S1 code screenshots and block references."
+  - "Kit identity. physical-inventory.yaml does not exist, so the build (no gear or wheel is specified in either document) and the Bluetooth/Wi-Fi connection method cannot be confirmed against hardware the academy owns. Standing known_unknown ev3-academy-kit-identity, routed physical_action_required (plan step F2). Blocks: APPROVED on the three kit-dependent claims above."
+  - "Age band vs. seeded-bug safety rule — RESOLVED by owner ruling 2026-08-23: the PDF is the truth. Ages 11-13, as stated in both PDFs, is the governing band for this course, including physical-bug safety sourcing. Any seeded-bug safety claim for this course sources against 11-13, not the schema's 8-to-10 example band."
+
+# No approval_record: this run made no routed decision, it recorded holes.
+# verdict stays BLOCKED regardless of review outcome below: schema rule
+# "verdict APPROVED is invalid if any required claim has status NEEDS_SOURCING,
+# REFUTED, or UNVERIFIED" — this receipt legitimately carries several (the
+# holes), so BLOCKED is correct even after a clean review, not a defect.
+
+review_receipt:
+  - subject_id: "all 18 claim cards in this receipt"
+    actor: codex
+    role: reviewer
+    inputs: "L1-s1.ev3-specialist.yaml, intake-schema.yaml, source-catalog.yaml, both source PDFs (PyMuPDF direct extraction)"
+    verdict: APPROVED
+    citations: [ev3-l1-source-material-v1, ev3-l1-trainer-guide-v1]
+    severity_covered: "high, medium, low — refuter pass attempted on all 5 severity:high claims, none refuted"
+    note: >
+      4 rounds to converge. Round 1 FAIL (5 scope-ceiling wording violations:
+      invented gear-tooth counts, invented unit "centimetres", invented
+      seeded-bug exclusivity ruling, invented Bluetooth dongle requirement,
+      Motor-A-exclusivity overclaim) — all fixed directly, re-verified against
+      PDF text. Round 3 FAIL (2 precision findings: units locator falsely
+      claimed no unit word anywhere in S1 vs. "Movement Units" heading;
+      environment-absence fact wrongly marked NEEDS_SOURCING instead of
+      SOURCED) — fixed, split into sourced-fact + unresolved-inference pairs.
+      Round 4: PASS, no findings.
+  - subject_id: "all 18 claim cards in this receipt (round 2 snapshot)"
+    actor: opencode
+    role: refuter
+    inputs: "L1-s1.ev3-specialist.yaml, intake-schema.yaml, source-catalog.yaml, both source PDFs (PyMuPDF direct extraction)"
+    verdict: APPROVED
+    citations: [ev3-l1-source-material-v1, ev3-l1-trainer-guide-v1]
+    severity_covered: "high, medium, low — refuter pass attempted on all 5 severity:high claims, none refuted"
+    note: >
+      Round 1 FAIL then round 2 PASS on its own re-check, with 2 minor
+      non-blocking findings (footer high-severity count off by one; gear-ratio
+      locator overscoped to the whole document instead of S1 pages) — both
+      fixed directly. Did not re-run against the round-3/4 codex fixes
+      (units/environment split), which are narrower precision edits to claims
+      opencode had already independently verified as SOURCED-worthy in
+      substance.

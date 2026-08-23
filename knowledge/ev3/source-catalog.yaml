@@ -1,0 +1,46 @@
+# knowledge/ev3/source-catalog.yaml
+#
+# Owned by lane F1. One entry per source, shape per intake-schema.yaml
+# source_entry (section 2). status: active — real EV3 content arrived
+# 2026-08-22, license confirmed internal-use by owner 2026-08-23.
+
+version: 1
+status: active
+
+sources:
+  - source_id: ev3-l1-source-material-v1
+    tier: 1
+    title: "EV3 Level 1 Source Material v1.0"
+    origin: "EV3 source/LV 1/EV3-L1_Source-Material_v1.0.pdf"
+    retrieved_on: "2026-08-22"
+    version_or_date: "v1.0"
+    applicability:
+      hardware: "unknown — not stated in document; academy kit identity is a separate open known_unknown (ev3-academy-kit-identity)"
+      software: "unknown — not stated in document; see known_unknown ev3-software-environment"
+      firmware: "unknown — not stated in document"
+    confidence: high
+    license: "internal-use — academy-owned course material, authored by Abdeen for this course (owner ruling 2026-08-23)"
+    notes: >
+      Tier-1 for course scope/content only (what this course teaches — sessions,
+      builds, code, images). Per owner ruling 2026-08-23 ("content PDF is
+      ceiling, not floor"), this document is the exact scope truth. It does
+      NOT establish which physical hardware the academy owns — that remains
+      UNVERIFIED pending F2/physical-inventory.yaml.
+
+  - source_id: ev3-l1-trainer-guide-v1
+    tier: 1
+    title: "EV3 Level 1 Trainer Guide v1.0 (draft)"
+    origin: "EV3 source/LV 1/EV3-L1_Trainer-Guide_v1.0.pdf"
+    retrieved_on: "2026-08-22"
+    version_or_date: "v1.0 (draft)"
+    applicability:
+      hardware: "unknown — not stated in document"
+      software: "unknown — not stated in document"
+      firmware: "unknown — not stated in document"
+    confidence: high
+    license: "internal-use — academy-owned course material, paired draft of ev3-l1-source-material-v1 (owner ruling 2026-08-23)"
+    notes: >
+      Supporting/paired material to ev3-l1-source-material-v1. Same ceiling
+      rule applies. Where the two disagree, the source-material entry is
+      authoritative (it is the content PDF; this is the trainer-facing
+      supporting draft).
