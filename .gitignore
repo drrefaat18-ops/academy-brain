@@ -40,3 +40,6 @@ nul
 # agent fan-out logs
 .claude/skills/**/_s0_*.log
 .tmp-pytest/
+
+# scratch (EV3 review prompts, retry scripts, session logs)
+scratchpad/

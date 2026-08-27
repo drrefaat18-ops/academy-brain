@@ -44,3 +44,38 @@ sources:
       rule applies. Where the two disagree, the source-material entry is
       authoritative (it is the content PDF; this is the trainer-facing
       supporting draft).
+
+  - source_id: ev3-l2-source-material-v1
+    tier: 1
+    title: "EV3 Level 2 Source Material v1.0"
+    origin: "EV3 source/LV2/EV3-L2_Source-Material_v1.0 (1).pdf"
+    retrieved_on: "2026-08-26"
+    version_or_date: "v1.0"
+    applicability:
+      hardware: "unknown — not stated in document; academy kit identity is a separate open known_unknown (ev3-academy-kit-identity)"
+      software: "unknown — not stated in document; see known_unknown ev3-software-environment"
+      firmware: "unknown — not stated in document"
+    confidence: high
+    license: "internal-use — academy-owned course material (same authorship/ownership basis as ev3-l1-source-material-v1, owner ruling 2026-08-23)"
+    notes: >
+      Tier-1 for course scope/content only, same ceiling rule as L1 (owner
+      ruling 2026-08-23, "content PDF is ceiling, not floor"). Does NOT
+      establish which physical hardware the academy owns — that remains
+      UNVERIFIED pending F2/physical-inventory.yaml.
+
+  - source_id: ev3-l2-trainer-guide-v1
+    tier: 1
+    title: "EV3 Level 2 Trainer Guide v1.0"
+    origin: "EV3 source/LV2/EV3-L2_Trainer-Guide_v1.0 (1).pdf"
+    retrieved_on: "2026-08-26"
+    version_or_date: "v1.0"
+    applicability:
+      hardware: "unknown — not stated in document"
+      software: "unknown — not stated in document"
+      firmware: "unknown — not stated in document"
+    confidence: high
+    license: "internal-use — document is explicitly marked INTERNAL USE ONLY; paired guide to ev3-l2-source-material-v1"
+    notes: >
+      Supporting/paired material to ev3-l2-source-material-v1. Same ceiling
+      rule applies. Where the two disagree, the source-material entry is
+      authoritative.
