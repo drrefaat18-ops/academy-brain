@@ -41,6 +41,7 @@ SCAFFOLD_FILES = (
     "pyproject.toml",
     "00-contracts/brand-and-output.md",
     "00-contracts/rubric.md",
+    "00-contracts/pipeline-lessons.md",
     "75-bundle/_TEMPLATE-blueprint.md",
     "75-bundle/_TEMPLATE-debugging-lab.md",
 )
