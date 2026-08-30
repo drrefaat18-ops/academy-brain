@@ -145,6 +145,7 @@ def manifest_text(seed: Seed) -> str:
     parse error in a file nobody reads until a gate fails.
     """
     doc = {
+        "name": seed.name,
         "levels": list(seed.levels),
         "sessions_per_level": seed.sessions_per_level,
         "providers": list(seed.providers),

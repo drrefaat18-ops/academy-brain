@@ -6,6 +6,7 @@ from swarm.config import CourseConfigError, StageDirectories, load_course
 
 
 VALID_CONFIG = """\
+name: Test Course
 levels: [1, 2]
 sessions_per_level: 8
 providers: [claude, codex, opencode, hermes]

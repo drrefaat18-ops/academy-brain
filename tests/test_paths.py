@@ -5,6 +5,7 @@ from swarm.config import load_course
 
 
 ALTERNATIVE_CONFIG = """\
+name: Test Course
 levels: [3, 5]
 sessions_per_level: 2
 providers: [alpha, beta]

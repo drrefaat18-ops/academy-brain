@@ -428,3 +428,32 @@ def test_a_listed_xref_with_no_placement_rect_is_caught(tmp_path):
 
     with pytest.raises(overlay.OverlayError, match="no placement rect"):
         overlay.assert_filled(deck, {"bug-1": png})
+
+
+def test_evidence_clause_emits_the_marker_overlay_parses():
+    """L2-s2 regression. The prompt producer and the overlay consumer have to
+    agree on one literal marker syntax. They did not: evidence_clause() only
+    asked for "a single clean empty image area" in prose, so NotebookLM never
+    printed `[Reserved Image Area: <aid>]` and assert_filled() failed the deck
+    for assets it could not find a marker for. This asserts the contract
+    directly — the clause must contain a string that overlay.REGION matches,
+    carrying the real asset id."""
+    from pathlib import Path
+
+    from swarm.generate_session import Asset, evidence_clause
+
+    ev = [
+        Asset(
+            aid="ev3-l2s2-img02",
+            slide="5",
+            path=Path("ev3-l2s2-img02.png"),
+            klass="EVIDENCE",
+            status="Produced and mapped",
+        )
+    ]
+    clause = evidence_clause(ev)
+
+    assert overlay.REGION.findall(clause) == ["ev3-l2s2-img02"], (
+        "evidence_clause must emit a marker overlay.REGION can parse"
+    )
+    assert "[Reserved Image Area: ev3-l2s2-img02]" in clause

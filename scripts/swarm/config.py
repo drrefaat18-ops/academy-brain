@@ -38,6 +38,7 @@ class AssetDiscovery:
 
 @dataclass(frozen=True)
 class CourseConfig:
+    name: str
     levels: tuple[int, ...]
     sessions_per_level: int
     providers: frozenset[str]
@@ -60,6 +61,7 @@ class CourseConfig:
 
 _TOP_LEVEL_FIELDS = frozenset(
     {
+        "name",
         "levels",
         "sessions_per_level",
         "providers",
@@ -193,6 +195,13 @@ def load_course(root: Path) -> CourseConfig:
     if missing:
         raise CourseConfigError(f"{source}: missing field(s): {', '.join(sorted(missing))}")
 
+    # The course's human name. A real field rather than the header comment it
+    # used to be: generate_session.py titles every deck with it, and a title is
+    # not the place to discover that the manifest never carried the name.
+    name_raw = data["name"]
+    if not isinstance(name_raw, str) or not name_raw.strip():
+        raise CourseConfigError(f"{source}: name must be a non-empty string")
+
     levels_raw = data["levels"]
     if (
         not isinstance(levels_raw, list)
@@ -243,6 +252,7 @@ def load_course(root: Path) -> CourseConfig:
         raise CourseConfigError(f"{source}: missing field(s): {names}")
 
     return CourseConfig(
+        name=name_raw.strip(),
         levels=tuple(levels_raw),
         sessions_per_level=sessions,
         providers=frozenset(providers_raw),

@@ -27,8 +27,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import re
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -38,14 +40,14 @@ from swarm import overlay as _overlay  # noqa: E402
 from swarm import paths  # noqa: E402
 
 VAULT = paths.VAULT_ROOT
+COURSE = paths.COURSE
 BRAND = VAULT / "Techno Square identity"
 
-# ponytail: the brand rule files live outside the vault, in Abdeen's originals.
-# Copying them in would fork the doctrine; upload them from where they are.
-BRAIN_OS = Path(
-    r"D:\vault\GPT_Behavior_Deconstruction_Vault\00_RAW_SOURCES"
-    r"\Abdeen_Moon_OS_Docs\Academy_Brain_OS"
-)
+# The academy brand doctrine, owned by this vault. Abdeen no longer edits
+# the originals (owner ruling 2026-08-30), so the war-room copy is the source
+# and the external GPT_Behavior vault is archive. Resolved from the vault
+# root, not an absolute path: renaming the vault must not break it.
+BRAIN_OS = VAULT / "Abdeen_Moon_OS_Docs" / "Academy_Brain_OS"
 BRANDING_RULE = BRAIN_OS / "Techno_Square_Branding_Rule.md"
 TATA_GUIDE = BRAIN_OS / "Tata_Mascot_Usage Guide.md"
 
@@ -408,15 +410,22 @@ def evidence_clause(evidence: list[Asset]) -> str:
     """
     if not evidence:
         return ""
-    rows = "\n".join(f"- slide {a.slide}: {a.aid}" for a in evidence)
+    rows = "\n".join(
+        f"- slide {a.slide}: write exactly [Reserved Image Area: {a.aid}]"
+        for a in evidence
+    )
     return (
         "\n\nReserved image regions. These slides carry a real screenshot that is "
         "inserted after export:\n"
         f"{rows}\n"
-        "On each of those slides, leave a single clean empty image area and put "
-        "nothing in it. Do NOT draw, recreate, paraphrase, illustrate or imagine "
-        "the code or the device. An invented screenshot is worse than an empty "
-        "box, because it looks right and teaches something false."
+        "On each of those slides, leave a single clean empty image area and write "
+        "the marker line shown above as literal text, character for character, "
+        "including the square brackets. Nothing else goes in that area. The "
+        "marker is how the post-export step finds where to paste the real "
+        "screenshot; without it the build fails. Do NOT draw, recreate, "
+        "paraphrase, illustrate or imagine the code or the device. An invented "
+        "screenshot is worse than an empty box, because it looks right and "
+        "teaches something false."
     )
 
 
@@ -432,17 +441,20 @@ def _is_brand(p: Path) -> bool:
 
 def build_plan(sid: str, assets: list[Asset], prompts: dict[str, str]) -> list[Pass]:
     bundle = VAULT / "75-bundle" / sid
-    missing = [k for k in ("deck-a", "deck-b", "summary") if k not in prompts]
+    # deck-b is optional: only sessions whose slide count exceeds NotebookLM's
+    # single-pass cap need a second pass. A short deck (like a 15-
+    # slides) has no "PASS B" section in the prompt file, and that is correct,
+    # not a missing block.
+    missing = [k for k in ("deck-a", "summary") if k not in prompts]
     if missing:
         raise HardStop(f"prompt file has no block for: {', '.join(missing)}")
 
     reference = [a for a in assets if a.klass == "REFERENCE"]
     evidence = [a for a in assets if a.klass == "EVIDENCE"]
 
-    deck_title = f"TechnoSquare microbit {sid} — student deck"
+    deck_title = f"{COURSE.name} {sid} — student deck"
     common = [
         Upload(bundle / "slides-source.md", "slides-source.md"),
-        Upload(bundle / "trainer-guide.md", "trainer-guide.md"),
         Upload(bundle / "decisions.md", "decisions.md"),
         Upload(BRANDING_RULE, "Techno_Square_Branding_Rule.md"),
         Upload(TATA_GUIDE, "Tata_Mascot_Usage_Guide.md"),
@@ -459,17 +471,23 @@ def build_plan(sid: str, assets: list[Asset], prompts: dict[str, str]) -> list[P
         Upload(TATA_GUIDE, "Tata_Mascot_Usage_Guide.md"),
     ] + [Upload(a.path, a.path.name) for a in summary_refs]
 
-    return [
+    plan = [
         Pass("deck-a", deck_title, prompts["deck-a"] + evidence_clause(evidence), common, evidence),
-        Pass("deck-b", deck_title, prompts["deck-b"] + evidence_clause(evidence), common, evidence),
+    ]
+    if "deck-b" in prompts:
+        plan.append(
+            Pass("deck-b", deck_title, prompts["deck-b"] + evidence_clause(evidence), common, evidence)
+        )
+    plan.append(
         Pass(
             "summary",
-            f"TechnoSquare microbit {sid} — student summary",
+            f"{COURSE.name} {sid} — student summary",
             prompts["summary"],
             summary,
             [],
-        ),
-    ]
+        )
+    )
+    return plan
 
 
 def preflight(plan: list[Pass]) -> list[str]:
@@ -526,12 +544,147 @@ def _composite(deck: Path, ps: Pass) -> None:
     """
     assets = _evidence_map(ps)
     if _overlay.find_regions(deck):
-        filled = _overlay.overlay(deck, assets)
+        # Overlay into a scratch copy first, verify it, then atomically swap it
+        # in. `overlay()`'s in-place `saveIncr()` on `deck` directly would leave
+        # a crash mid-write (or a second, concurrently-resuming caller doing the
+        # same) with a corrupted or half-overlaid production file that no rerun
+        # can distinguish from "already composited".
+        # The real extension stays LAST: overlay() dispatches its handler on the
+        # suffix, so a scratch named "deck.pdf.compositing123" is an unsupported
+        # format and this whole atomic-swap path raises instead of protecting.
+        tmp = deck.with_name(f"{deck.stem}.compositing{os.getpid()}{deck.suffix}")
+        import shutil
+
+        try:
+            shutil.copy2(deck, tmp)
+            filled = _overlay.overlay(tmp, assets)
+            _overlay.assert_filled(tmp, assets)
+            tmp.replace(deck)
+        except BaseException:
+            tmp.unlink(missing_ok=True)
+            raise
         print(f"  overlaid {len(filled)} region(s): {', '.join(filled)}")
     # `assets` is passed so the check verifies images are PRESENT, not merely
     # that markers are absent. A run interrupted between redaction and insertion
     # leaves a deck with neither, which the marker-only check called a pass.
     _overlay.assert_filled(deck, assets)
+
+
+@dataclass(frozen=True)
+class _TaskState:
+    notebook_id: str
+    task_id: str  # "" means a request is pending/in-flight, result not yet known
+
+
+_CORRUPT = object()  # sentinel: file exists but is not a valid state record
+
+
+def _encode_task_state(state: "_TaskState") -> str:
+    return f"{state.notebook_id}\n{state.task_id}"
+
+
+def _decode_task_state(text: str) -> "_TaskState | object":
+    """Parse the sidecar's exact two-line format. Anything else is _CORRUPT."""
+    lines = text.split("\n")
+    if len(lines) != 2:
+        return _CORRUPT
+    notebook_id, task_id = lines
+    if not notebook_id:
+        return _CORRUPT
+    return _TaskState(notebook_id=notebook_id, task_id=task_id)
+
+
+def _load_task_state(path: Path) -> "_TaskState | None | object":
+    """Read a pass's generation-lock sidecar. None = no lock, _CORRUPT = unreadable."""
+    if not path.is_file():
+        return None
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError):
+        return _CORRUPT
+    return _decode_task_state(text)
+
+
+def _claim_task_lock(path: Path, nb_id: str, attempts: int = 5) -> "_TaskState | None | object":
+    """Exclusively create the pending-marker sidecar to claim this pass.
+
+    Returns None if this call won the race and the marker is now ours to fill
+    in with a real task_id. Returns the pre-existing state (a _TaskState, or
+    _CORRUPT) if someone else — a prior run, or a process that started at the
+    same instant — already claimed it; O_CREAT|O_EXCL makes "check, then
+    write" a single atomic step so two simultaneous callers cannot both see
+    "no lock" and both proceed to generate_slide_deck.
+
+    A losing FileExistsError followed by a read that finds nothing (the
+    winner already finished and cleaned up its lock between our failed
+    create and our read) must never be treated as "we won" — that would let
+    a second caller regenerate right after a first caller's success. Retry
+    the whole create-or-read transition instead; if the file keeps
+    flickering in and out of existence this many times, something is
+    actively racing and the caller should see a real, current state rather
+    than silently winning a stale-seeming claim.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    for _ in range(attempts):
+        try:
+            with path.open("x", encoding="utf-8") as f:
+                f.write(_encode_task_state(_TaskState(notebook_id=nb_id, task_id="")))
+            return None
+        except FileExistsError:
+            state = _load_task_state(path)
+            if state is not None:
+                return state
+            # the file existed a moment ago and is now gone — retry the claim
+    raise HardStop(
+        f"{path} kept appearing and disappearing across {attempts} attempts to "
+        f"claim it — a concurrent run is actively finishing at the same "
+        f"moment. Rerun once it settles."
+    )
+
+
+def _save_task_state(path: Path, state: _TaskState) -> None:
+    """Overwrite an already-claimed sidecar atomically (crash mid-write leaves the old file intact)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f"{path.name}.tmp{os.getpid()}")
+    tmp.write_text(_encode_task_state(state), encoding="utf-8")
+    tmp.replace(path)
+
+
+@contextmanager
+def _pass_execution_lock(out_dir: Path, key: str):
+    """Exclusive lock spanning the entire decide/resume → download → composite →
+    cleanup section for one pass.
+
+    `_claim_task_lock` only makes the "no state yet, start a fresh generation"
+    transition atomic. It does nothing to stop two callers who both find an
+    EXISTING sidecar (one still holding a real, resumable task_id) from both
+    entering the resume branch at once — both would download to the same PDF
+    path and both would call `_composite` on it concurrently. This lock
+    closes that gap by serializing the whole section for a given
+    (out_dir, key), regardless of which state (fresh, resuming, recovering
+    from a crashed composite) that section takes.
+
+    A held lock surviving a killed process (no heartbeat/PID liveness check)
+    is a real, accepted risk here — this codebase prefers a manual escape
+    hatch (operator inspects the notebook, deletes the lock) over automatic
+    lock-breaking, same as `.task_id`'s own corrupt/mismatch handling above.
+    """
+    path = out_dir / f"{key}.lock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fd = path.open("x", encoding="utf-8")
+    except FileExistsError as exc:
+        raise HardStop(
+            f"{path} exists — another process is actively working this pass "
+            f"right now (or crashed while holding it). Do not run a second "
+            f"invocation concurrently; if you've confirmed nothing is running, "
+            f"delete {path} manually and rerun."
+        ) from exc
+    try:
+        fd.close()
+        yield
+    finally:
+        path.unlink(missing_ok=True)
 
 
 async def _run_pass(client, ps: Pass, out_dir: Path, notebooks: dict[str, str]) -> dict:
@@ -561,41 +714,141 @@ async def _run_pass(client, ps: Pass, out_dir: Path, notebooks: dict[str, str]) 
     if not_ready:
         raise HardStop(f"sources not READY: {', '.join(not_ready)}")
 
-    # A finished pass is never regenerated. Quota is daily and small; a rerun
-    # after one pass of three failed must not spend a slot on work already done.
-    done = out_dir / f"{ps.key}.pdf"
-    if done.is_file():
-        print(f"  {ps.key} already downloaded at {done} — skipping generation")
-        _composite(done, ps)
-        return {"pass": ps.key, "notebook_id": nb_id, "task_id": None, "output": str(done)}
+    with _pass_execution_lock(out_dir, ps.key):
+        # A finished pass is never regenerated. Quota is daily and small; a rerun
+        # after one pass of three failed must not spend a slot on work already done.
+        done = out_dir / f"{ps.key}.pdf"
+        # A prior run's task is resumed here, never re-requested. Without this,
+        # any ArtifactNotReadyError/timeout on download made the caller's only
+        # recovery path a full rerun, which — because `done` above is still
+        # missing — called generate_slide_deck again and fired a second,
+        # unwanted deck generation on top of the first one still rendering.
+        task_id_file = out_dir / f"{ps.key}.task_id"
 
-    # step 5-6
-    status = await client.artifacts.generate_slide_deck(
-        nb_id,
-        instructions=ps.instructions,
-        slide_format=SlideDeckFormat.DETAILED_DECK,
-        language="ar",
-    )
-    task_id = getattr(status, "task_id", None)
-    if not task_id:
-        # an empty success, not an empty error — the daily-quota signature
-        raise HardStop(
-            "generate_slide_deck returned an empty task_id. This is NotebookLM's "
-            "daily quota exhaustion signature, not short-term rate limiting. Stop "
-            "and wait for the reset; retrying only burns time."
-        )
-    out = out_dir / f"{ps.key}.pdf"
-    try:
-        await client.artifacts.wait_for_completion(nb_id, task_id, initial_interval=15)
-    except TimeoutError:
-        # A client-side give-up is not a server-side failure; the deck is often
-        # already finished. Only a timeout means this — every other exception is
-        # a real defect and must not be disguised as a download attempt.
-        print("  wait timed out; the deck may already be done — trying download")
-    await client.artifacts.download_slide_deck(nb_id, out, artifact_id=task_id)
-    print(f"  downloaded {out}")
-    _composite(out, ps)
-    return {"pass": ps.key, "notebook_id": nb_id, "task_id": task_id, "output": str(out)}
+        if done.is_file() and not task_id_file.is_file():
+            # A PDF on disk with NO surviving sidecar means a prior run finished
+            # end-to-end (download + compositing) and cleaned up after itself —
+            # genuinely done. A PDF on disk WITH a surviving sidecar instead means
+            # a prior attempt crashed mid-compositing (see below): that PDF may be
+            # partial or corrupt, so it must NOT be trusted here — fall through to
+            # the resume path instead, which re-downloads a known-good copy before
+            # compositing again.
+            print(f"  {ps.key} already downloaded at {done} — skipping generation")
+            _composite(done, ps)
+            return {"pass": ps.key, "notebook_id": nb_id, "task_id": None, "output": str(done)}
+
+        # Exclusive create, not load-then-save: two processes racing to start this
+        # pass at the same instant must not both observe "no lock" and both call
+        # generate_slide_deck. Only the loser of the O_CREAT|O_EXCL race gets a
+        # non-None state back here.
+        state = _claim_task_lock(task_id_file, nb_id)
+
+        if state is _CORRUPT:
+            raise HardStop(
+                f"{task_id_file} is empty or unreadable. A prior generation may be "
+                f"in flight or may have crashed before recording its task_id — do "
+                f"NOT delete this file blindly. Inspect notebook {nb_id!r} in "
+                f"NotebookLM for a pending/in-progress {ps.key} artifact first; "
+                f"only delete the file to force a fresh generation once you've "
+                f"confirmed none is running."
+            )
+        if state is not None and state.notebook_id != nb_id:
+            raise HardStop(
+                f"{task_id_file} records notebook_id {state.notebook_id!r} but this "
+                f"run resolved notebook {nb_id!r} for {ps.notebook!r} — the notebook "
+                f"was likely deleted and recreated under the same title. Resuming "
+                f"this task_id against the new notebook cannot succeed. Inspect "
+                f"both notebooks manually, then delete {task_id_file} to regenerate."
+            )
+        if state is not None and not state.task_id:
+            raise HardStop(
+                f"{task_id_file} exists but has no task_id recorded — generation "
+                f"was requested but this process (or a concurrent one) never "
+                f"recorded the result, possibly still in flight. Inspect notebook "
+                f"{nb_id!r} in NotebookLM manually before deleting {task_id_file} "
+                f"to retry; do not let this rerun call generate_slide_deck again "
+                f"while that ambiguity is unresolved."
+            )
+
+        if state is None and done.is_file():
+            # We won the claim, but a concurrent run finished (downloaded the PDF
+            # and deleted its own lock) in the gap between our `done.is_file()`
+            # check above and this claim succeeding. Release the now-pointless
+            # lock we just created and take the already-done path instead of
+            # generating a second time.
+            task_id_file.unlink(missing_ok=True)
+            print(f"  {ps.key} already downloaded at {done} — skipping generation")
+            _composite(done, ps)
+            return {"pass": ps.key, "notebook_id": nb_id, "task_id": None, "output": str(done)}
+
+        if state is None:
+            # _claim_task_lock already wrote the pending marker (no task_id yet)
+            # via an exclusive create, so any other invocation racing this one
+            # gets a non-None state above and hard-stops instead of also calling
+            # generate_slide_deck for the same pass.
+            # step 5-6
+            status = await client.artifacts.generate_slide_deck(
+                nb_id,
+                instructions=ps.instructions,
+                slide_format=SlideDeckFormat.DETAILED_DECK,
+                language="ar",
+            )
+            task_id = getattr(status, "task_id", None)
+            if not task_id:
+                # an empty success, not an empty error — the daily-quota signature
+                raise HardStop(
+                    "generate_slide_deck returned an empty task_id. This is NotebookLM's "
+                    "daily quota exhaustion signature, not short-term rate limiting. Stop "
+                    "and wait for the reset; retrying only burns time."
+                )
+            _save_task_state(task_id_file, _TaskState(notebook_id=nb_id, task_id=task_id))
+        else:
+            task_id = state.task_id
+            print(f"  resuming pending {ps.key} task {task_id} — not re-firing generation")
+
+        out = out_dir / f"{ps.key}.pdf"
+        gen_status = None
+        try:
+            gen_status = await client.artifacts.wait_for_completion(nb_id, task_id, initial_interval=15)
+        except TimeoutError:
+            # A client-side give-up is not a server-side failure; the deck is often
+            # already finished. Only a timeout means this — every other exception is
+            # a real defect and must not be disguised as a download attempt.
+            print("  wait timed out; the deck may already be done — trying download")
+
+        if gen_status is not None and (gen_status.is_failed or gen_status.is_removed or gen_status.is_not_found):
+            # ArtifactNotReadyError below is raised for every non-completed selection
+            # (pending, in-progress, failed, removed, missing) — it does not by itself
+            # distinguish "still rendering" from "permanently dead". Only wait_for_
+            # completion's own returned status tells them apart, so that check must
+            # happen before treating a download failure as transient.
+            raise HardStop(
+                f"{ps.key} task {task_id} ended in terminal status "
+                f"{gen_status.status!r} ({gen_status.error or 'no error detail'}). "
+                f"This will never become ready — rerunning will not help. Inspect "
+                f"notebook {nb_id!r} manually, then delete {task_id_file} to "
+                f"regenerate intentionally."
+            )
+
+        from notebooklm.exceptions import ArtifactNotReadyError
+
+        try:
+            await client.artifacts.download_slide_deck(nb_id, out, artifact_id=task_id)
+        except ArtifactNotReadyError:
+            # Not ready yet is not a failure to recover from by regenerating — the
+            # sidecar file above keeps this exact task_id resumable on the next
+            # invocation instead of spending another quota slot on a duplicate.
+            print(f"  {ps.key} artifact {task_id} not ready yet — rerun to resume, not regenerate")
+            raise HardStop(f"{ps.key} artifact {task_id} not ready yet; rerun to resume")
+        print(f"  downloaded {out}")
+        # The sidecar is the recovery record for "generation was requested but
+        # the pass isn't done yet" — it must stay in place until the pass is
+        # actually done, including compositing. Deleting it before _composite
+        # succeeds would let a crash mid-composite look like "no lock, safe to
+        # regenerate" on the next run, even though the download itself worked.
+        _composite(out, ps)
+        task_id_file.unlink(missing_ok=True)
+        return {"pass": ps.key, "notebook_id": nb_id, "task_id": task_id, "output": str(out)}
 
 
 async def run_live(sid: str, plan: list[Pass]) -> dict:
@@ -758,7 +1011,283 @@ def _demo() -> None:
     clause = evidence_clause([assets[1]])
     assert "slide 17" in clause and "Do NOT draw" in clause
     assert evidence_clause([]) == ""
+
+    # generation-lock sidecar: no file, exclusive claim, resumable, corrupt, mismatch
+    with tempfile.TemporaryDirectory() as td:
+        f = Path(td) / "deck-a.task_id"
+        assert _load_task_state(f) is None
+
+        # first claim wins and leaves a pending marker
+        assert _claim_task_lock(f, "nb-1") is None
+        state = _load_task_state(f)
+        assert state == _TaskState(notebook_id="nb-1", task_id="")
+
+        # a second, simultaneous claim attempt loses the O_CREAT|O_EXCL race
+        # and gets the winner's state back instead of also proceeding
+        lost = _claim_task_lock(f, "nb-1")
+        assert lost == _TaskState(notebook_id="nb-1", task_id="")
+
+        # the winner fills in the real task_id once generation is accepted
+        _save_task_state(f, _TaskState(notebook_id="nb-1", task_id="task-9"))
+        state = _load_task_state(f)
+        assert state == _TaskState(notebook_id="nb-1", task_id="task-9")
+        assert state.notebook_id == "nb-1"  # mismatch check compares against a different nb_id by the caller
+
+        f.write_text("", encoding="utf-8")
+        assert _load_task_state(f) is _CORRUPT
+
+        f.write_text("garbage-no-newline", encoding="utf-8")
+        assert _load_task_state(f) is _CORRUPT
+
+        # a third line (embedded newline in task_id, or trailing junk) must not
+        # silently parse into a usable, resumable task_id
+        f.write_text("nb-1\ntask-9\nJUNK", encoding="utf-8")
+        assert _load_task_state(f) is _CORRUPT
+
+        f.write_text("nb-1\n\nJUNK", encoding="utf-8")
+        assert _load_task_state(f) is _CORRUPT
+
+        f.unlink()
+
+    asyncio.run(_demo_run_pass())
     print("self-check OK")
+
+
+class _FakeSourceStatus:
+    value = READY
+
+
+class _FakeSource:
+    def __init__(self, title: str) -> None:
+        self.title = title
+        self.status = _FakeSourceStatus()
+
+
+class _FakeSources:
+    async def list(self, nb_id: str) -> list[_FakeSource]:
+        return [_FakeSource("slides-source.md")]
+
+    async def add_file(self, nb_id: str, path, wait: bool = True, title: str = "") -> None:  # pragma: no cover
+        raise AssertionError("uploads must not run when a notebook_id is already known")
+
+
+class _FakeArtifacts:
+    """Records calls so a test can assert generate_slide_deck fired at most once."""
+
+    def __init__(self, gen_status=None, download_error: Exception | None = None) -> None:
+        self.generate_calls = 0
+        self.download_calls = 0
+        self.gen_status = gen_status
+        self.download_error = download_error
+
+    async def generate_slide_deck(self, nb_id, instructions, slide_format, language):  # noqa: D401
+        self.generate_calls += 1
+
+        class _Status:
+            task_id = "fresh-task-id"
+
+        return _Status()
+
+    async def wait_for_completion(self, nb_id, task_id, initial_interval=15):
+        if self.gen_status is not None:
+            return self.gen_status
+        raise TimeoutError("client gave up")
+
+    async def download_slide_deck(self, nb_id, out, artifact_id):
+        self.download_calls += 1
+        if self.download_error is not None:
+            raise self.download_error
+        import fitz  # _composite() opens the downloaded file as a real PDF
+
+        doc = fitz.open()
+        doc.new_page()
+        doc.save(out)
+        doc.close()
+
+
+class _FakeClient:
+    def __init__(self, artifacts: _FakeArtifacts) -> None:
+        self.sources = _FakeSources()
+        self.artifacts = artifacts
+
+
+async def _demo_run_pass() -> None:
+    import tempfile
+
+    from notebooklm.exceptions import ArtifactNotReadyError
+
+    ps = Pass(key="deck-a", notebook="nb-title", instructions="do it")
+
+    # 1. an existing sidecar with a real task_id resumes instead of regenerating
+    with tempfile.TemporaryDirectory() as td:
+        out_dir = Path(td)
+        _save_task_state(out_dir / "deck-a.task_id", _TaskState(notebook_id="nb-1", task_id="old-task"))
+        art = _FakeArtifacts(download_error=ArtifactNotReadyError("slide_deck", artifact_id="old-task"))
+        client = _FakeClient(art)
+        try:
+            await _run_pass(client, ps, out_dir, {"nb-title": "nb-1"})
+        except HardStop as exc:
+            assert "old-task" in str(exc) and "rerun to resume" in str(exc), exc
+        else:  # pragma: no cover
+            raise AssertionError("not-ready download did not hard-stop")
+        assert art.generate_calls == 0, "resumed task must not call generate_slide_deck again"
+        assert (out_dir / "deck-a.task_id").is_file(), "sidecar must survive a not-ready hard-stop"
+
+    # 2. sidecar recorded a different notebook_id than the one this run resolved
+    with tempfile.TemporaryDirectory() as td:
+        out_dir = Path(td)
+        _save_task_state(out_dir / "deck-a.task_id", _TaskState(notebook_id="nb-OLD", task_id="stale-task"))
+        art = _FakeArtifacts()
+        client = _FakeClient(art)
+        try:
+            await _run_pass(client, ps, out_dir, {"nb-title": "nb-NEW"})
+        except HardStop as exc:
+            assert "nb-OLD" in str(exc) and "nb-NEW" in str(exc), exc
+        else:  # pragma: no cover
+            raise AssertionError("notebook mismatch did not hard-stop")
+        assert art.generate_calls == 0
+
+    # 3. a corrupt sidecar must not be silently treated as resumable or regenerated over
+    with tempfile.TemporaryDirectory() as td:
+        out_dir = Path(td)
+        (out_dir / "deck-a.task_id").write_text("", encoding="utf-8")
+        art = _FakeArtifacts()
+        client = _FakeClient(art)
+        try:
+            await _run_pass(client, ps, out_dir, {"nb-title": "nb-1"})
+        except HardStop as exc:
+            assert "unreadable" in str(exc) or "empty" in str(exc), exc
+        else:  # pragma: no cover
+            raise AssertionError("corrupt sidecar did not hard-stop")
+        assert art.generate_calls == 0
+
+    # 4. a terminal-failed generation must hard-stop distinctly, not loop as "not ready yet"
+    with tempfile.TemporaryDirectory() as td:
+        out_dir = Path(td)
+
+        class _FailedStatus:
+            status = "failed"
+            error = "quota"
+            is_failed = True
+            is_removed = False
+            is_not_found = False
+
+        art = _FakeArtifacts(gen_status=_FailedStatus())
+        client = _FakeClient(art)
+        try:
+            await _run_pass(client, ps, out_dir, {"nb-title": "nb-1"})
+        except HardStop as exc:
+            assert "terminal status" in str(exc) and "'failed'" in str(exc), exc
+        else:  # pragma: no cover
+            raise AssertionError("terminal failure did not hard-stop")
+        assert art.generate_calls == 1
+        assert art.download_calls == 0, "a known-dead task must not even attempt download"
+
+    # 4b. a held execution lock rejects a second caller outright — this is what
+    # actually closes the "two callers both resume the same real-task sidecar"
+    # gap: _claim_task_lock only guards the fresh-generation transition, not
+    # a second concurrent resume of an already-existing sidecar
+    with tempfile.TemporaryDirectory() as td:
+        out_dir = Path(td)
+        _save_task_state(out_dir / "deck-a.task_id", _TaskState(notebook_id="nb-1", task_id="in-flight"))
+        (out_dir / "deck-a.lock").touch()
+        art = _FakeArtifacts()
+        client = _FakeClient(art)
+        try:
+            await _run_pass(client, ps, out_dir, {"nb-title": "nb-1"})
+        except HardStop as exc:
+            assert "deck-a.lock" in str(exc) and "another process" in str(exc), exc
+        else:  # pragma: no cover
+            raise AssertionError("a held execution lock did not hard-stop a second caller")
+        assert art.generate_calls == 0
+        assert art.download_calls == 0
+        assert (out_dir / "deck-a.lock").is_file(), "rejecting a second caller must not release the first caller's lock"
+
+    # 5. a fresh pass with no sidecar generates exactly once, downloads, and cleans up the sidecar
+    with tempfile.TemporaryDirectory() as td:
+        out_dir = Path(td)
+
+        class _CompleteStatus:
+            status = "completed"
+            error = None
+            is_failed = False
+            is_removed = False
+            is_not_found = False
+
+        art = _FakeArtifacts(gen_status=_CompleteStatus())
+        client = _FakeClient(art)
+        result = await _run_pass(client, ps, out_dir, {"nb-title": "nb-1"})
+        assert art.generate_calls == 1
+        assert art.download_calls == 1
+        assert result["task_id"] == "fresh-task-id"
+        assert not (out_dir / "deck-a.task_id").exists(), "sidecar must be cleaned up on success"
+        assert not (out_dir / "deck-a.lock").exists(), "execution lock must be released on success"
+        assert (out_dir / "deck-a.pdf").is_file()
+
+    # 6. a PDF already on disk (e.g. a concurrent run finished first) must
+    # never trigger generation, regardless of which of the two done.is_file()
+    # checks catches it — this only exercises the entry check; the recheck
+    # immediately after a won claim (same guard, exercised for the same
+    # invariant) has no independent test because reproducing that exact
+    # interleaving needs real concurrency, not just a fake client
+    with tempfile.TemporaryDirectory() as td:
+        out_dir = Path(td)
+        import fitz as _fitz
+
+        _doc = _fitz.open()
+        _doc.new_page()
+        _doc.save(out_dir / "deck-a.pdf")
+        _doc.close()
+        art = _FakeArtifacts()
+        client = _FakeClient(art)
+        result = await _run_pass(client, ps, out_dir, {"nb-title": "nb-1"})
+        assert art.generate_calls == 0, "a PDF that appeared between check and claim must not trigger generation"
+        assert result["task_id"] is None
+        assert not (out_dir / "deck-a.task_id").exists(), "the pointless claim must be released"
+
+    # 7. the sidecar must survive a post-download compositing failure — deleting
+    # it before compositing succeeds would make a crashed-mid-composite pass
+    # look like "no lock, safe to regenerate" on the next run
+    with tempfile.TemporaryDirectory() as td:
+        out_dir = Path(td)
+
+        class _CompleteStatus2:
+            status = "completed"
+            error = None
+            is_failed = False
+            is_removed = False
+            is_not_found = False
+
+        art = _FakeArtifacts(gen_status=_CompleteStatus2())
+        client = _FakeClient(art)
+        module = sys.modules[__name__]
+        real_composite = module._composite
+
+        def _boom(deck, ps_):
+            raise RuntimeError("compositing exploded")
+
+        module._composite = _boom
+        try:
+            try:
+                await _run_pass(client, ps, out_dir, {"nb-title": "nb-1"})
+            except RuntimeError as exc:
+                assert "compositing exploded" in str(exc)
+            else:  # pragma: no cover
+                raise AssertionError("compositing failure was swallowed")
+        finally:
+            module._composite = real_composite
+        assert (out_dir / "deck-a.task_id").is_file(), "sidecar must survive a compositing failure"
+        assert (out_dir / "deck-a.pdf").is_file(), "the pre-composite download is still on disk"
+
+        # rerunning must NOT trust that stale PDF via the entry shortcut — the
+        # surviving sidecar means the download may be partial/corrupt, so it
+        # must resume (re-download a known-good copy, recomposite, then clean
+        # up) rather than short-circuiting on mere PDF presence
+        result = await _run_pass(client, ps, out_dir, {"nb-title": "nb-1"})
+        assert art.generate_calls == 1, "resuming a surviving sidecar must not regenerate"
+        assert art.download_calls == 2, "recovery must re-download rather than trust the stale local PDF"
+        assert result["task_id"] == "fresh-task-id"
+        assert not (out_dir / "deck-a.task_id").exists(), "sidecar is cleaned up once recovery composites successfully"
 
 
 # --------------------------------------------------------------------------
