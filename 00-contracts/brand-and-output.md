@@ -184,7 +184,21 @@ That ordering is now binding.
 
 ## 3. Brand chrome
 
-- Techno Square logo is the official identity, present on student slides.
+- Techno Square logo is the official identity. **Placement is restricted, not
+  per-slide** (owner ruling 2026-08-26, extended academy-wide 2026-08-30):
+  student slide deck — **first and last slide only**; student summary deck —
+  **first slide only**. No logo on any other slide.
+  - Rationale: every additional placement is another opportunity for the
+    generator to redraw the mark instead of placing the real asset. Found in
+    the EV3 course, and the failure is a generator behaviour rather than
+    anything about EV3 — the L2-s1 deck rendered mid-deck wordmarks as
+    "TECHNO SQUARE LAND" and "Techno Square / landscape", reconstructing the
+    mark from the asset filename `landscape logo.png`. L1-s7 was retired
+    outright for hallucinated logos. The first and last slides carry the
+    branding adequately.
+  - Bind the logo to those slides in each session's `ASSET-MAPPING.md`. Do not
+    write an every-slide brand-chrome instruction into `slides-source.md` or
+    `home-summary.md`.
 - Dark/black accents with yellow or gold highlights.
 - Large titles. Icons, arrows, simple shapes, clear images. No crowded slides.
 - **One idea per slide.**
