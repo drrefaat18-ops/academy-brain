@@ -90,7 +90,12 @@ class Seed:
             raise ScaffoldError(
                 f"slug {self.slug!r} must be lowercase letters, digits and hyphens"
             )
-        if not isinstance(self.name, str) or not self.name:
+        if (
+            not isinstance(self.name, str)
+            or not self.name.strip()
+            or "\n" in self.name
+            or "\r" in self.name
+        ):
             raise ScaffoldError(f"name {self.name!r} must be a non-empty string")
         if not self.levels or any(
             not isinstance(n, int) or isinstance(n, bool) or n <= 0 for n in self.levels
@@ -179,7 +184,7 @@ def topology_text(seed: Seed, course: config.CourseConfig) -> str:
     with the seed even when the manifest on disk says something else.
     """
     lines = [
-        f"# {seed.name} — topology",
+        f"# {course.name} — topology",
         "",
         "Generated from `course.yaml`. Do not edit by hand; edit the manifest.",
         "",

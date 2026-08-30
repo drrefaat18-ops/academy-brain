@@ -41,8 +41,8 @@ sequencing, or claims. Your job is presentation, not authorship.
 
 Read the brand doctrine and apply it as the visual system:
 D:\vault\Microbit\00-contracts\brand-and-output.md
-D:\vault\GPT_Behavior_Deconstruction_Vault\00_RAW_SOURCES\Abdeen_Moon_OS_Docs\Academy_Brain_OS\Techno_Square_Branding_Rule.md
-D:\vault\GPT_Behavior_Deconstruction_Vault\00_RAW_SOURCES\Abdeen_Moon_OS_Docs\Academy_Brain_OS\Tata_Mascot_Usage Guide.md
+D:\vault\Microbit\Abdeen_Moon_OS_Docs\Academy_Brain_OS\Techno_Square_Branding_Rule.md
+D:\vault\Microbit\Abdeen_Moon_OS_Docs\Academy_Brain_OS\Tata_Mascot_Usage Guide.md
 
 Brand assets:
 D:\vault\Microbit\Techno Square identity\PNG\landscape logo.png

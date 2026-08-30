@@ -201,6 +201,8 @@ def load_course(root: Path) -> CourseConfig:
     name_raw = data["name"]
     if not isinstance(name_raw, str) or not name_raw.strip():
         raise CourseConfigError(f"{source}: name must be a non-empty string")
+    if "\n" in name_raw or "\r" in name_raw:
+        raise CourseConfigError(f"{source}: name must be single-line")
 
     levels_raw = data["levels"]
     if (

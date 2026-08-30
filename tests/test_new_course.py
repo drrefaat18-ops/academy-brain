@@ -9,6 +9,7 @@ having written a manifest nobody validated, or having copied one course's
 content into the next one.
 """
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -85,6 +86,31 @@ def test_topology_is_derived_from_the_manifest(course):
     assert "| L1-s1 | yes |" in text
     assert "| L2-s8 | no |" in text
     assert "claude, codex" in text
+
+
+def test_topology_uses_the_loaded_course_name():
+    loaded = config.CourseConfig(
+        name="Validated Course",
+        levels=(1,),
+        sessions_per_level=1,
+        providers=frozenset({"claude"}),
+        artifact_schedule=(True,),
+        asset_discovery=config.AssetDiscovery(
+            ref=re.compile("`(img-[^`]+[.]png)`"),
+            source_files=("slides-source.md",),
+            expect_references=True,
+        ),
+        stages=config.StageDirectories(
+            digest="10-digest",
+            digest_assets="_assets",
+            provenance="20-provenance",
+            receipts="90-receipts",
+        ),
+    )
+
+    text = new_course.topology_text(EV3_SEED, loaded)
+
+    assert text.startswith("# Validated Course — topology")
 
 
 def test_stage_tree_exists_and_is_empty(course):
@@ -172,6 +198,14 @@ def test_refuses_a_malformed_slug(tmp_path, slug):
     seed = new_course.Seed(**{**EV3_SEED.__dict__, "slug": slug})
     with pytest.raises(new_course.ScaffoldError, match="slug"):
         new_course.create(seed, tmp_path / "c", VAULT)
+
+
+@pytest.mark.parametrize("name", ["", "   ", "Course\nName", 42])
+def test_refuses_a_malformed_name(tmp_path, name):
+    seed = new_course.Seed(**{**EV3_SEED.__dict__, "name": name})
+
+    with pytest.raises(new_course.ScaffoldError, match="name"):
+        seed.validate()
 
 
 def test_refuses_a_schedule_that_does_not_cover_every_session(tmp_path):

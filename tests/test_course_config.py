@@ -54,6 +54,14 @@ def test_load_course_returns_typed_validated_config(tmp_path):
     )
 
 
+@pytest.mark.parametrize("encoded_name", [r"Course\nName", r"Course\rName"])
+def test_load_course_rejects_multiline_name(tmp_path, encoded_name):
+    write_config(tmp_path, VALID_CONFIG.replace("Test Course", f'"{encoded_name}"'))
+
+    with pytest.raises(CourseConfigError, match="single-line"):
+        load_course(tmp_path)
+
+
 def test_load_course_missing_file_is_actionable(tmp_path):
     with pytest.raises(CourseConfigError, match=r"course\.yaml.*does not exist"):
         load_course(tmp_path)

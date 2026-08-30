@@ -7,12 +7,12 @@ purpose: >-
   as binding contract for EthOS v2. This is the continuity guarantee: output must
   feel like what Abdeen shipped, improved — not replaced.
 sources:
-  - GPT_Behavior_Deconstruction_Vault/00_RAW_SOURCES/Abdeen_Moon_OS_Docs/Academy_Brain_OS/AI_Tools_Workflow_Guide.md
-  - .../Academy_Brain_OS/Production_Workflow_and_SAVE_Mode.md
-  - .../Academy_Brain_OS/Techno_Square_Branding_Rule.md
-  - .../Academy_Brain_OS/Tata_Mascot_Usage Guide.md
-  - .../Academy_Brain_OS/Academy_Language_and_Output_Rules.md
-  - .../Academy_Brain_OS/Techno_Square_QA_Checklist.md
+  - Abdeen_Moon_OS_Docs/Academy_Brain_OS/AI_Tools_Workflow_Guide.md
+  - Abdeen_Moon_OS_Docs/Academy_Brain_OS/Production_Workflow_and_SAVE_Mode.md
+  - Abdeen_Moon_OS_Docs/Academy_Brain_OS/Techno_Square_Branding_Rule.md
+  - Abdeen_Moon_OS_Docs/Academy_Brain_OS/Tata_Mascot_Usage Guide.md
+  - Abdeen_Moon_OS_Docs/Academy_Brain_OS/Academy_Language_and_Output_Rules.md
+  - Abdeen_Moon_OS_Docs/Academy_Brain_OS/Techno_Square_QA_Checklist.md
 ---
 
 # Brand and Output Contract

@@ -128,8 +128,8 @@ reaching the judge — don't bother writing them.
 
 ## Brand/output doctrine recovered (2026-08-20)
 
-Abdeen's original moonOS doctrine was found at
-`GPT_Behavior_Deconstruction_Vault/00_RAW_SOURCES/Abdeen_Moon_OS_Docs/Academy_Brain_OS/`.
+The academy doctrine source of truth is
+`Abdeen_Moon_OS_Docs/Academy_Brain_OS/` in this vault.
 It is now restated as a binding contract: `00-contracts/brand-and-output.md`.
 **Read that contract before producing any artifact.** Key facts it settles:
 
