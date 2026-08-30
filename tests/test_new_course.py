@@ -124,6 +124,9 @@ def test_stage_tree_exists_and_is_empty(course):
                 "_TEMPLATE-blueprint.md",
                 "_TEMPLATE-debugging-lab.md",
             }
+        elif rel == "knowledge":  # carries the schema, which is not content
+            assert [p.name for p in d.iterdir()] == ["_schema"]
+            assert {p.name for p in (d / "_schema").iterdir()} == {"intake-schema.yaml"}
         else:
             assert list(d.iterdir()) == [], f"{rel} must start empty"
 

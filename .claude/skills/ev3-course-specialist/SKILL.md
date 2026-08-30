@@ -25,7 +25,7 @@ explicit target — a session ID, a file, or a named artifact. No target ⇒ ask
 You may know things about EV3. That knowledge is a hypothesis to be sourced, not
 a fact to be emitted. Every externally checkable EV3 statement that leaves this
 skill carries one of the four canonical statuses, and the citation rules follow
-from it (`claim_card.fields_by_status` in `knowledge/ev3/intake-schema.yaml`):
+from it (`claim_card.fields_by_status` in `knowledge/_schema/intake-schema.yaml`):
 
 - `SOURCED` — `source_id` + exact locator. Usable.
 - `REFUTED` — `source_id` + exact locator, naming the source that CONTRADICTS it.
@@ -52,7 +52,7 @@ question "what does it do?" Never mix the two up.
 
 ### Claim record — the unit of output
 
-**`knowledge/ev3/intake-schema.yaml` is the canonical definition.** This block is a
+**`knowledge/_schema/intake-schema.yaml` is the canonical definition.** This block is a
 reminder of its shape, not a second source of truth; when they disagree, the schema
 wins and the disagreement is a defect to report.
 
@@ -68,7 +68,7 @@ severity: high | medium | low
 
 A `SOURCED` claim without `locator` is not a claim. For every other status the
 rule is set by `claim_card.fields_by_status` in
-`knowledge/ev3/intake-schema.yaml`, and it is not "always null": a `REFUTED`
+`knowledge/_schema/intake-schema.yaml`, and it is not "always null": a `REFUTED`
 claim MUST keep the `source_id` and `locator` that refuted it, or the evidence
 is thrown away. `NEEDS_SOURCING` carries null for both. `UNVERIFIED` may carry
 a source, and must carry a locator if it does.
@@ -279,7 +279,7 @@ Until then, produce claims and receipts normally and let them carry
 Honesty note, added after adversarial review (2026-08-22). The plan says
 anti-hallucination is "enforced, not promised". **Today it is mostly promised.**
 
-**Every rule in `knowledge/ev3/intake-schema.yaml` is NOT_ENFORCED unless this
+**Every rule in `knowledge/_schema/intake-schema.yaml` is NOT_ENFORCED unless this
 table says otherwise.** The single partial exception is the last row. The rows
 below name the rule families explicitly rather than leaving the reader to infer
 which of them the table forgot.

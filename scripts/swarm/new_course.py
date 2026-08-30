@@ -42,6 +42,8 @@ SCAFFOLD_FILES = (
     "00-contracts/brand-and-output.md",
     "00-contracts/rubric.md",
     "00-contracts/pipeline-lessons.md",
+    "00-contracts/pdf-intake-sop.md",
+    "knowledge/_schema/intake-schema.yaml",
     "75-bundle/_TEMPLATE-blueprint.md",
     "75-bundle/_TEMPLATE-debugging-lab.md",
 )

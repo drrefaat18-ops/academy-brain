@@ -1,14 +1,19 @@
-# knowledge/ev3/intake-schema.yaml
+# knowledge/_schema/intake-schema.yaml
 #
-# The shape every EV3 fact must take before it is allowed into the pipeline.
-# Owned by lane D. Consumed by .claude/agents/ev3-specialist.md and by human
-# reviewers. NOTHING in scripts/ reads this file: scripts/swarm/gates/cite_filter.py
-# is a nearby but unrelated gate that parses critique JSON issues[].cites and has
-# no knowledge of claim cards. See the enforcement_status block below.
+# The shape every sourced fact must take before it is allowed into the
+# pipeline, for any course spawned from this vault. Originally written for
+# EV3 (`.claude/agents/ev3-specialist.md`) and promoted here 2026-08-30 once
+# a second course made clear it was never EV3-specific — nothing in it names
+# EV3, LEGO, or any other course's domain. A course's own domain specialist
+# (an `ev3-specialist`-shaped agent for its subject) consumes this, plus
+# human reviewers. NOTHING in scripts/ reads this file:
+# scripts/swarm/gates/cite_filter.py is a nearby but unrelated gate that
+# parses critique JSON issues[].cites and has no knowledge of claim cards.
+# See the enforcement_status block below.
 #
-# This file is a SCHEMA, not data. It contains no EV3 facts, because no EV3
-# course content has been delivered yet (confirmed 2026-08-22). Every example
-# below is marked as an example and must never be read as a sourced claim.
+# This file is a SCHEMA, not data. It contains no course facts. Every
+# example below is marked as an example and must never be read as a sourced
+# claim.
 
 version: 1
 status: awaiting_content          # flips to `active` when EV3 material arrives
@@ -288,35 +293,9 @@ known_unknown:
     would_settle_it: "the specific source or observation that would close it"
     routed_to:     "specialist_council | owner_business | physical_action_required"
 
-# Standing entries. These are NOT sourced EV3 claims and assert nothing about EV3.
-# Each records a hole and how to close it, which is the opposite of a claim. They
-# live here rather than in a data file because they are true before any content
-# exists; move them to knowledge/ev3/known-unknowns.yaml once that file has company.
-known_unknowns_are_claims: false
-known_unknowns:
-  - id: ev3-physical-bug-safety
-    question: "Which physical EV3 faults are safe and reversible for an 8-to-10-year-old to induce and undo?"
-    blocks: "every physical seeded bug in every session"
-    would_settle_it: "tier-1 manufacturer safety guidance, or an academy trainer observation receipt"
-    routed_to: specialist_council
-
-  - id: ev3-academy-kit-identity
-    question: "Which EV3 kit(s) does the academy physically own, and how many?"
-    blocks: "all applicability checks; any claim that depends on a specific part"
-    would_settle_it: "label text, quantities, and photographs of identifying labels"
-    routed_to: physical_action_required
-
-  - id: ev3-software-environment
-    question: "Which EV3 programming environment and version will be used?"
-    blocks: "all code bugs, all block references, the build/program/test sequence"
-    would_settle_it: >
-      the delivered EV3 course content. If it does not specify, the specialist council
-      sources the available environments, analyses compatibility against the academy
-      kit, and RECOMMENDS one. This is agent work and must be completed first. It
-      reaches owner_business only if a genuinely non-technical commercial or strategic
-      choice remains after that — a licence cost, a vendor relationship — never the
-      technical question of which environment is suitable.
-    routed_to: specialist_council
+# A course's own known-unknowns are DATA, not schema, and never belong in this
+# file. Record them per-course at knowledge/<course>/known-unknowns.yaml, same
+# shape as known_unknown above. EV3's are at knowledge/ev3/known-unknowns.yaml.
 
 # ---------------------------------------------------------------------------
 # 7b. Typed approval, independent review, and localisation provenance

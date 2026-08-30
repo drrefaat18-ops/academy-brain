@@ -107,7 +107,7 @@ claims:
   # One example per status, because a single row with a status UNION and
   # placeholder citations is copyable into a violation: NEEDS_SOURCING with a
   # non-null source_id contradicts the rules it sits under. Rules are canonical in
-  # knowledge/ev3/intake-schema.yaml claim_card.fields_by_status.
+  # knowledge/_schema/intake-schema.yaml claim_card.fields_by_status.
   - claim: <a statement a cited source supports>
     status: SOURCED            # both fields required
     source_id: <key into knowledge/ev3/source-catalog.yaml>
@@ -133,7 +133,7 @@ claims:
     applicability: <which kit/firmware/software it would need to hold for>
     confidence: low
 # approval_record and review_receipt are the canonical structures from
-# knowledge/ev3/intake-schema.yaml. A free-standing `review:` map used to appear
+# knowledge/_schema/intake-schema.yaml. A free-standing `review:` map used to appear
 # here instead, which could not express council evidence or an owner-business
 # category — a receipt that cannot represent the schema is not a receipt.
 approval_record:
@@ -157,7 +157,7 @@ holes:
   - <what is missing and what would settle it>
 ```
 
-The claim shape here must match `knowledge/ev3/intake-schema.yaml` exactly. That
+The claim shape here must match `knowledge/_schema/intake-schema.yaml` exactly. That
 file is canonical; if this block and the schema disagree, the schema wins and the
 disagreement is a defect to report, not a choice to make.
 
@@ -170,6 +170,6 @@ There is exactly ONE verdict, for the run. A claim carries `status`, never its
 own verdict. `review_receipt` is a LIST: a run can carry both a reviewer pass
 and a refuter pass.
 
-This envelope is `specialist_receipt` in `knowledge/ev3/intake-schema.yaml`.
+This envelope is `specialist_receipt` in `knowledge/_schema/intake-schema.yaml`.
 That file is canonical; if this block and the schema disagree, the schema wins
 and the disagreement is a defect to report, not a choice to make.

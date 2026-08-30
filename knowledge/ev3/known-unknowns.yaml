@@ -1,0 +1,32 @@
+# knowledge/ev3/known-unknowns.yaml
+#
+# Shape per knowledge/_schema/intake-schema.yaml section 7 (known_unknown).
+# Moved out of the schema file 2026-08-30 when intake-schema.yaml was
+# promoted to a course-neutral location — these are EV3 course data, not
+# schema, and never belonged in a file every future course inherits.
+
+known_unknowns_are_claims: false
+known_unknowns:
+  - id: ev3-physical-bug-safety
+    question: "Which physical EV3 faults are safe and reversible for an 8-to-10-year-old to induce and undo?"
+    blocks: "every physical seeded bug in every session"
+    would_settle_it: "tier-1 manufacturer safety guidance, or an academy trainer observation receipt"
+    routed_to: specialist_council
+
+  - id: ev3-academy-kit-identity
+    question: "Which EV3 kit(s) does the academy physically own, and how many?"
+    blocks: "all applicability checks; any claim that depends on a specific part"
+    would_settle_it: "label text, quantities, and photographs of identifying labels"
+    routed_to: physical_action_required
+
+  - id: ev3-software-environment
+    question: "Which EV3 programming environment and version will be used?"
+    blocks: "all code bugs, all block references, the build/program/test sequence"
+    would_settle_it: >
+      the delivered EV3 course content. If it does not specify, the specialist council
+      sources the available environments, analyses compatibility against the academy
+      kit, and RECOMMENDS one. This is agent work and must be completed first. It
+      reaches owner_business only if a genuinely non-technical commercial or strategic
+      choice remains after that — a licence cost, a vendor relationship — never the
+      technical question of which environment is suitable.
+    routed_to: specialist_council
