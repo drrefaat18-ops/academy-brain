@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-ROOT = Path("D:/vault/Microbit/.claude/skills/ethos-v2")
+WAR_ROOM = Path("D:/vault/academy-brain")
+ROOT = WAR_ROOM / ".claude/skills/ethos-v2"
 SKILL = ROOT / "SKILL.md"
 KIDS = ROOT / "references/kids-track-rules.md"
 

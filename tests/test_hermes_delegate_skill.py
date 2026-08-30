@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-SKILL = Path("D:/vault/Microbit/.claude/skills/hermes-delegate/SKILL.md")
+WAR_ROOM = Path("D:/vault/academy-brain")
+SKILL = WAR_ROOM / ".claude/skills/hermes-delegate/SKILL.md"
 
 
 @pytest.fixture
