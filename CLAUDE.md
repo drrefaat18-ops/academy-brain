@@ -2,7 +2,7 @@
 
 ## EV3 work boundary (this cwd is NOT the EV3 repo)
 
-Sessions launch here (`D:\vault\Microbit`), but EV3 course work lives in the
+Sessions launch here (`D:\vault\academy-brain`), but EV3 course work lives in the
 separate repo `D:\vault\ev3-academy`. Both repos have identically-named stage
 folders (`10-digest`, `75-bundle`, `80-generation`, `90-receipts`, ...) and
 overlapping session ids (`L1-s1`..`L2-s8`), so a relative path can silently
@@ -10,14 +10,16 @@ succeed against the wrong tree.
 
 - ALWAYS use absolute `D:\vault\ev3-academy\...` paths for EV3 work. Never a
   relative stage path, and never a bare `scripts/swarm/generate_session.py`
-  (that selects the Microbit copy, which is a different, older fork).
+  (that selects the academy template rather than the EV3 course copy).
 - ALWAYS pass `git -C "D:\vault\ev3-academy"`. A bare `git` command here
-  targets Microbit.
+  targets academy-brain.
 - NEVER let prose reach a shell unquoted. `->` and `>` in a command string are
   redirects: they silently create junk files in this repo's root.
 
 EV3 primary sources, the `knowledge/ev3` catalog, and brand assets currently
-live under Microbit by absolute path. That is known and intentional for now.
+live under academy-brain. The compatibility junction at `D:\vault\Microbit`
+keeps shipped absolute references resolving; use `D:\vault\academy-brain` for
+new live references.
 
 ## Rules
 

@@ -131,6 +131,16 @@ def test_stage_tree_exists_and_is_empty(course):
             assert list(d.iterdir()) == [], f"{rel} must start empty"
 
 
+def test_new_course_inherits_standing_pipeline_contracts(course):
+    target, _ = course
+
+    for rel in (
+        "00-contracts/pipeline-lessons.md",
+        "00-contracts/pdf-intake-sop.md",
+    ):
+        assert (target / rel).read_bytes() == (VAULT / rel).read_bytes()
+
+
 def test_no_course_content_is_copied(course):
     """The scaffolder copies code and templates. Never lessons, assets or receipts."""
     target, _ = course
