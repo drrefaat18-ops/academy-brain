@@ -39,6 +39,15 @@ class AssetDiscovery:
 @dataclass(frozen=True)
 class CourseConfig:
     name: str
+    # The learner age band or experience level, declared ONCE here and
+    # referenced everywhere else (00-contracts/pedagogy.md §4). The first course
+    # carried three different age bands across its own research files precisely
+    # because every mention was written independently.
+    #
+    # Not to be confused with prepare.audience_of(), which reads an ARTIFACT's
+    # frontmatter to decide whether a file is learner- or trainer-facing. That
+    # is a different question about a different file.
+    audience: str
     levels: tuple[int, ...]
     sessions_per_level: int
     providers: frozenset[str]
@@ -62,6 +71,7 @@ class CourseConfig:
 _TOP_LEVEL_FIELDS = frozenset(
     {
         "name",
+        "audience",
         "levels",
         "sessions_per_level",
         "providers",
@@ -204,6 +214,19 @@ def load_course(root: Path) -> CourseConfig:
     if "\n" in name_raw or "\r" in name_raw:
         raise CourseConfigError(f"{source}: name must be single-line")
 
+    # Required, not optional. pedagogy.md §4 forbids inheriting an audience from
+    # another course, and an optional field would be inherited by omission: the
+    # scaffolder would produce a course whose age band is whatever the last
+    # person assumed.
+    audience_raw = data["audience"]
+    if not isinstance(audience_raw, str) or not audience_raw.strip():
+        raise CourseConfigError(
+            f"{source}: audience must be a non-empty string — the learner age band "
+            "or experience level this course is written for (pedagogy.md §4)"
+        )
+    if "\n" in audience_raw or "\r" in audience_raw:
+        raise CourseConfigError(f"{source}: audience must be single-line")
+
     levels_raw = data["levels"]
     if (
         not isinstance(levels_raw, list)
@@ -255,6 +278,7 @@ def load_course(root: Path) -> CourseConfig:
 
     return CourseConfig(
         name=name_raw.strip(),
+        audience=audience_raw.strip(),
         levels=tuple(levels_raw),
         sessions_per_level=sessions,
         providers=frozenset(providers_raw),

@@ -6,6 +6,7 @@ from swarm.config import load_course
 
 ALTERNATIVE_CONFIG = """\
 name: Test Course
+audience: ages 9-12
 levels: [3, 5]
 sessions_per_level: 2
 providers: [alpha, beta]

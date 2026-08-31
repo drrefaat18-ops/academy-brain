@@ -7,6 +7,7 @@ from swarm.config import CourseConfigError, StageDirectories, load_course
 
 VALID_CONFIG = """\
 name: Test Course
+audience: ages 9-12
 levels: [1, 2]
 sessions_per_level: 8
 providers: [claude, codex, opencode, hermes]
@@ -59,6 +60,22 @@ def test_load_course_rejects_multiline_name(tmp_path, encoded_name):
     write_config(tmp_path, VALID_CONFIG.replace("Test Course", f'"{encoded_name}"'))
 
     with pytest.raises(CourseConfigError, match="single-line"):
+        load_course(tmp_path)
+
+
+def test_audience_is_required_not_optional(tmp_path):
+    """pedagogy.md §4. An optional field is inherited by omission — the new
+    course's age band silently becomes whatever the last person assumed."""
+    write_config(tmp_path, VALID_CONFIG.replace("audience: ages 9-12\n", ""))
+
+    with pytest.raises(CourseConfigError, match="audience"):
+        load_course(tmp_path)
+
+
+def test_blank_audience_is_refused(tmp_path):
+    write_config(tmp_path, VALID_CONFIG.replace("ages 9-12", "'   '"))
+
+    with pytest.raises(CourseConfigError, match="audience must be a non-empty"):
         load_course(tmp_path)
 
 

@@ -23,6 +23,7 @@ EV3_REF = re.compile(r"`((?:shot|render)[A-Za-z0-9_.\-]*\.(?:png|svg))`")
 # Everything a manifest needs besides discovery. load_course validates the whole
 # document, so a fixture manifest has to be a real one.
 MANIFEST_BASE = """name: Test Course
+audience: ages 9-12
 levels: [1]
 sessions_per_level: 8
 providers: [claude, codex, opencode, hermes]

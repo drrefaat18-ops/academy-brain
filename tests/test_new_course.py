@@ -9,6 +9,7 @@ having written a manifest nobody validated, or having copied one course's
 content into the next one.
 """
 
+import dataclasses
 import re
 import subprocess
 import sys
@@ -23,6 +24,8 @@ VAULT = Path(__file__).resolve().parents[1]
 EV3_SEED = new_course.Seed(
     slug="kids-ev3",
     name="Techno Square EV3 kids track",
+    audience="ages 9-12, no prior programming",
+    subject="LEGO MINDSTORMS EV3",
     levels=(1, 2),
     sessions_per_level=8,
     providers=("claude", "codex"),
@@ -91,6 +94,7 @@ def test_topology_is_derived_from_the_manifest(course):
 def test_topology_uses_the_loaded_course_name():
     loaded = config.CourseConfig(
         name="Validated Course",
+        audience="ages 9-12",
         levels=(1,),
         sessions_per_level=1,
         providers=frozenset({"claude"}),
@@ -153,6 +157,96 @@ def test_new_course_inherits_a_specialist_template(course):
     rel = ".claude/agents/_TEMPLATE-course-specialist.md"
     assert (target / rel).is_file(), "new course has no specialist template"
     assert (target / rel).read_bytes() == (VAULT / rel).read_bytes()
+
+
+def test_the_specialist_is_instantiated_not_merely_copied(course):
+    """A template is a role nobody holds until the placeholders are filled.
+
+    An agent file still saying `COURSE` names no skill, writes to
+    `knowledge/COURSE/`, and answers to none of pedagogy.md's rules under any
+    name the course actually uses.
+    """
+    target, _ = course
+    agent = target / ".claude/agents/kids-ev3-specialist.md"
+    assert agent.is_file(), "new course has no instantiated specialist"
+    text = agent.read_text(encoding="utf-8")
+
+    assert "COURSE" not in text, "placeholders survived instantiation"
+    assert "SUBJECT" not in text
+    assert "name: kids-ev3-specialist" in text
+    assert "required_skill: kids-ev3-course-specialist" in text
+    assert "knowledge/kids-ev3/source-catalog.yaml" in text
+    assert "LEGO MINDSTORMS EV3" in text, "the subject was not substituted"
+
+    # The human-facing fill-in markers must survive as markers, not dissolve
+    # into the slug — they are the only signal that the file is unfinished.
+    assert f"TODO(kids-ev3):" in text
+
+
+def test_specialist_instantiation_refuses_a_drifted_template(tmp_path):
+    root = tmp_path / "course"
+    template = root / new_course.SPECIALIST_TEMPLATE
+    template.parent.mkdir(parents=True)
+    template.write_text(
+        (VAULT / new_course.SPECIALIST_TEMPLATE)
+        .read_text(encoding="utf-8")
+        .replace("Copied into every new course", "Used by every new course"),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(new_course.ScaffoldError, match="template header"):
+        new_course._instantiate_specialist(EV3_SEED, root)
+
+    assert not (root / ".claude/agents/kids-ev3-specialist.md").exists()
+
+
+def test_subject_text_is_not_treated_as_a_template_placeholder(tmp_path):
+    root = tmp_path / "course"
+    template = root / new_course.SPECIALIST_TEMPLATE
+    template.parent.mkdir(parents=True)
+    template.write_bytes((VAULT / new_course.SPECIALIST_TEMPLATE).read_bytes())
+    seed = dataclasses.replace(EV3_SEED, subject="SUBJECT and COURSE design")
+
+    rel = new_course._instantiate_specialist(seed, root)
+
+    text = (root / rel).read_text(encoding="utf-8")
+    assert "SUBJECT and COURSE design" in text
+
+
+def test_the_agent_memory_contract_ports(course):
+    """Required reading must port without one course's operating history."""
+    target, _ = course
+    rel = "00-contracts/agent-memory.md"
+    text = (target / rel).read_text(encoding="utf-8")
+
+    assert "The owner is not the course's domain expert" in text
+    assert "Reserve the owner only for" in text
+    for source_specific in (
+        "tencent/hy3",
+        "opencode/x-preview",
+        "Level 1 only, 6 sessions",
+        "Localization (Arabic)",
+        "NBLM",
+        "Antigravity",
+        "L1-s1 deck failed",
+    ):
+        assert source_specific not in text
+
+
+def test_the_manifest_declares_an_audience(course):
+    """pedagogy.md §4: declared once here, never inherited, never inline."""
+    target, cfg = course
+    assert cfg.audience == "ages 9-12, no prior programming"
+    assert "audience: ages 9-12, no prior programming" in (
+        target / "course.yaml"
+    ).read_text(encoding="utf-8")
+
+
+def test_a_course_without_an_audience_is_refused():
+    """Optional-by-omission is how one course inherits another's age band."""
+    seed = dataclasses.replace(EV3_SEED, audience="   ")
+    with pytest.raises(new_course.ScaffoldError, match="audience"):
+        seed.validate()
 
 
 def test_the_pedagogy_gate_runs_in_the_new_course(course):
@@ -303,6 +397,8 @@ def test_cli_creates_a_course(tmp_path, capsys):
             str(target),
             "--name",
             "EV3",
+            "--audience",
+            "ages 9-12",
             "--levels",
             "1",
             "--sessions-per-level",
@@ -337,6 +433,8 @@ def test_cli_reports_a_refusal_as_a_nonzero_exit(tmp_path, capsys):
             "new_course.py",
             "kids-ev3",
             str(target),
+            "--audience",
+            "ages 9-12",
             "--asset-ref-pattern",
             r"`(shot-[^`]+\.png)`",
             "--asset-source-files",
