@@ -111,6 +111,15 @@ def test_waiver_missing_authority_is_refused(vault):
     assert not ok and "authority" in detail
 
 
+def test_waiver_scope_must_match_the_stage(vault):
+    _waiver(vault, "L1-s1", "critique", reason="not-applicable", authority="owner",
+            scope="level", granted=dt.date(2026, 8, 31))
+    ok, detail = stage_gate.check_stage(
+        vault, stage_gate._BY_NAME["critique"], "L1-s1", TODAY
+    )
+    assert not ok and "scope" in detail
+
+
 def test_superseded_waiver_must_name_what_covers_it(vault):
     _waiver(vault, "L1-s1", "critique", reason="superseded", authority="owner",
             scope="session", granted=dt.date(2026, 8, 31))
@@ -136,13 +145,64 @@ def test_a_waiver_file_is_not_itself_evidence(vault):
     assert ok and "waived" in detail  # satisfied as a waiver, not counted as an artifact
 
 
+def test_a_level_scoped_stage_takes_a_level_named_waiver(vault):
+    """One decision, one file — not one identical file per session in the level."""
+    research = stage_gate._BY_NAME["research"]
+    assert stage_gate.waiver_path(vault, research, "L1-s5").name == "L1.waiver.yaml"
+
+    path = vault / research.directory / "L1.waiver.yaml"
+    path.write_text(
+        yaml.safe_dump({
+            "reason": "not-applicable", "authority": "owner",
+            "scope": "level", "granted": dt.date(2026, 8, 31),
+        }),
+        encoding="utf-8",
+    )
+    for sid in ("L1-s1", "L1-s5"):
+        ok, detail = stage_gate.check_stage(vault, research, sid, TODAY)
+        assert ok, (sid, detail)
+
+    # ...and it covers only its own level.
+    ok, _ = stage_gate.check_stage(vault, research, "L2-s1", TODAY)
+    assert not ok
+
+
+def test_a_session_scoped_waiver_is_refused_for_a_level_stage(vault):
+    """Codex's scope check: the waiver must agree with the stage it sits in."""
+    research = stage_gate._BY_NAME["research"]
+    (vault / research.directory / "L1.waiver.yaml").write_text(
+        yaml.safe_dump({
+            "reason": "not-applicable", "authority": "owner",
+            "scope": "session", "granted": dt.date(2026, 8, 31),
+        }),
+        encoding="utf-8",
+    )
+    ok, detail = stage_gate.check_stage(vault, research, "L1-s1", TODAY)
+    assert not ok and "scope" in detail
+
+
+def test_research_from_another_level_is_not_evidence(vault):
+    """The hole in the original `*.md` glob: any level's research satisfied any level."""
+    (vault / "30-research" / "L1").mkdir(parents=True, exist_ok=True)
+    (vault / "30-research" / "L1" / "T01.md").write_text("evidence", encoding="utf-8")
+    research = stage_gate._BY_NAME["research"]
+    assert stage_gate.check_stage(vault, research, "L1-s1", TODAY)[0]
+    assert not stage_gate.check_stage(vault, research, "L2-s1", TODAY)[0]
+
+
 # --- doctrine does not run backwards ---------------------------------------
 
 
 def _golden(vault, sid, name="deck-a.LOCKED-GOLDEN.pdf", sub=None):
     d = vault / "80-generation" / sid / (sub or "")
     d.mkdir(parents=True, exist_ok=True)
-    (d / name).write_bytes(b"%PDF-1.4 locked")
+    locked = d / name
+    locked.write_bytes(b"%PDF-1.4 locked")
+    if name.endswith(".LOCKED-GOLDEN.pdf"):
+        (d / name.removesuffix(".LOCKED-GOLDEN.pdf")).with_suffix(".pdf").write_bytes(
+            locked.read_bytes()
+        )
+    return locked
 
 
 def test_a_locked_session_is_not_re_judged(vault):
@@ -174,6 +234,40 @@ def test_an_unlocked_session_is_still_gated(vault):
 def test_unknown_stage_raises_rather_than_passing(vault):
     with pytest.raises(stage_gate.StageGateError):
         stage_gate.check(vault, "L1-s1", "no-such-stage", TODAY)
+
+
+def test_research_from_another_level_is_not_evidence(vault):
+    """Level-scoped research must not leak across levels."""
+    (vault / "30-research" / "L1").mkdir()
+    (vault / "30-research" / "L1" / "T01.md").write_text("research", encoding="utf-8")
+
+    ok, _ = stage_gate.check_stage(
+        vault, stage_gate._BY_NAME["research"], "L2-s1", TODAY
+    )
+
+    assert not ok
+
+
+def test_empty_pdf_with_lock_name_does_not_grandfather(vault):
+    _golden(vault, "L1-s1").write_bytes(b"")
+
+    assert not stage_gate.is_locked(vault, "L1-s1")
+
+
+def test_lock_must_be_byte_identical_to_the_accepted_artifact(vault):
+    locked = _golden(vault, "L1-s1")
+    locked.write_bytes(b"%PDF-1.7\nlocked")
+    (locked.parent / "deck-a.pdf").write_bytes(b"%PDF-1.7\ndifferent")
+
+    assert not stage_gate.is_locked(vault, "L1-s1")
+
+
+def test_rejected_directory_check_is_case_insensitive(vault):
+    locked = _golden(vault, "L1-s1", sub="_REJECTED")
+    locked.write_bytes(b"%PDF-1.7\nsame")
+    (locked.parent / "deck-a.pdf").write_bytes(b"%PDF-1.7\nsame")
+
+    assert not stage_gate.is_locked(vault, "L1-s1")
 
 
 def test_bad_session_id_is_refused(vault):

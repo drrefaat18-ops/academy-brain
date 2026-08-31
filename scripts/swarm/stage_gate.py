@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import filecmp
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,7 +32,7 @@ from .paths import validate_session_id
 # Bumped when the stage chain or the waiver contract changes in a way that would
 # alter a verdict. Stamped into every receipt so a later doctrine change can
 # never silently reinterpret an artifact that passed under earlier rules.
-DOCTRINE_VERSION = 1
+DOCTRINE_VERSION = 2
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -62,7 +63,7 @@ class Stage:
 # The chain, in order. A stage's prerequisites are every stage before it.
 STAGE_CHAIN: tuple[Stage, ...] = (
     Stage("receipts", "90-receipts", "{sid}.*.yaml", "session"),
-    Stage("research", "30-research", "*.md", "level"),
+    Stage("research", "30-research", "L{level}/*.md", "level"),
     Stage("digest", "10-digest", "{sid}.md", "session"),
     Stage("provenance", "20-provenance", "{sid}.md", "session"),
     Stage("critique", "40-critique", "{sid}/*.json", "session"),
@@ -96,17 +97,35 @@ def is_locked(vault: Path, sid: str) -> bool:
     root = vault / "80-generation" / sid
     if not root.is_dir():
         return False
-    return any(
-        "_rejected" not in p.parts and p.is_file()
-        for p in root.rglob("*.LOCKED-GOLDEN.pdf")
-    )
+    for locked in root.rglob("*.LOCKED-GOLDEN.pdf"):
+        if "_rejected" in {part.casefold() for part in locked.parts} or not locked.is_file():
+            continue
+        accepted = locked.with_name(
+            locked.name.removesuffix(".LOCKED-GOLDEN.pdf") + ".pdf"
+        )
+        try:
+            with locked.open("rb") as stream:
+                is_pdf = locked.stat().st_size > 5 and stream.read(5) == b"%PDF-"
+            if is_pdf and accepted.is_file() and filecmp.cmp(locked, accepted, shallow=False):
+                return True
+        except OSError:
+            continue
+    return False
 
 
 def waiver_path(vault: Path, stage: Stage, sid: str) -> Path:
+    """Where a waiver for this stage must live.
+
+    A level-scoped stage takes a level-named waiver. Naming it per session
+    would require one identical file per session in the level, each declaring
+    `scope: level` — eight chances to disagree about a single decision.
+    """
+    if stage.scope == "level":
+        return vault / stage.directory / f"L{_level_of(sid)}.waiver.yaml"
     return vault / stage.directory / f"{sid}.waiver.yaml"
 
 
-def read_waiver(path: Path, today: _dt.date) -> tuple[bool, str]:
+def read_waiver(path: Path, today: _dt.date, expected_scope: str) -> tuple[bool, str]:
     """Return (valid, detail). A malformed waiver is invalid, never ignored."""
     try:
         doc = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -124,6 +143,11 @@ def read_waiver(path: Path, today: _dt.date) -> tuple[bool, str]:
         return False, (
             f"waiver {path.name} reason {reason!r} is not one of "
             f"{', '.join(sorted(WAIVER_REASONS))}"
+        )
+    if doc["scope"] != expected_scope:
+        return False, (
+            f"waiver {path.name} scope {doc['scope']!r} does not match "
+            f"the stage scope {expected_scope!r}"
         )
     if reason == "superseded" and not doc.get("covered_by"):
         return False, f"waiver {path.name} claims 'superseded' but names no covered_by"
@@ -154,7 +178,7 @@ def check_stage(vault: Path, stage: Stage, sid: str, today: _dt.date) -> tuple[b
 
     wp = waiver_path(vault, stage, sid)
     if wp.is_file():
-        return read_waiver(wp, today)
+        return read_waiver(wp, today, stage.scope)
     return False, (
         f"no artifact matching {stage.directory}/{pattern} and no waiver at "
         f"{wp.relative_to(vault).as_posix()}"

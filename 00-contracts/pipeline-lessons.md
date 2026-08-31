@@ -198,7 +198,9 @@ is the executable statement of this list; `generate_session.py` calls it
 before any other gate, so a skipped stage hard-stops before quota is spent.
 
 Research is the one stage scoped to the LEVEL, not the session — one research
-set serves every session in its level. Every other stage is per-session.
+set at `30-research/L<level>/*.md` serves every session in its level. Every
+other stage is per-session. Research stored for a different level is not
+evidence for the level being checked.
 
 ### 8.2 Satisfying a stage
 

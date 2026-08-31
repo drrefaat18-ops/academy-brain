@@ -20,7 +20,7 @@ the course being judged, not to any one course's documents.
 |---|---|---|---|
 | **pedagogy** | 1.0 | The course's declared delivery arc is intact AND actually exercises the Bloom's cells that arc stage declares (`00-contracts/pedagogy.md`); one idea/slide; concrete-before-abstract for the course's configured age band | `00-contracts/pedagogy.md` + T05 (the course's own unit pedagogy) |
 | **technical** | 1.0 | The course platform's programming semantics are correct for every construct the slide uses, and the canonical code matches upstream | T04 (the course's block/API reference) |
-| **assessment** | 0.8 | Formative, non-written, embedded in the arc's own checking and sharing stages (exit ticket, demo, peer-share) — not a bolted-on written test | T02 (assessment design) |
+| **assessment** | 0.8 | Formative, non-written, embedded at suitable points in the course's declared arc (exit ticket, demo, peer-share) — not a bolted-on written test and not dependent on any fixed arc-stage names | T02 (assessment design) |
 | **differentiation** | 0.8 | Explicit support/challenge variants re-inserted where R0 `missing[]` flags them dropped | T01 (differentiation) |
 | **other** | 0.5 | Anything real but outside the four buckets above (naming, sequencing, licensing) | — |
 

@@ -120,6 +120,39 @@ def test_arc_bloom_naming_a_stage_outside_the_arc_fails():
     assert "not in the declared arc" in r.detail
 
 
+def test_non_mapping_session_fails_without_crashing():
+    r = run(record({"L1-s1": ["Create/producing"]}))
+
+    assert r.verdict == FAIL
+    assert "not a mapping" in r.detail
+
+
+def test_reaches_must_be_a_list_not_a_string():
+    r = run(record({"L1-s1": {
+        "reaches": "Create/producing",
+        "knowledge": ["Procedural"],
+        "assessment": "demo",
+    }}))
+
+    assert r.verdict == FAIL
+    assert "reaches" in r.detail and "list" in r.detail
+
+
+def test_arc_stage_names_must_be_strings():
+    r = run(record(
+        {"L1-s1": {
+            "reaches": ["Create/producing"],
+            "knowledge": ["Procedural"],
+            "assessment": "demo",
+        }},
+        arc=[["not", "hashable"]],
+        arc_bloom={},
+    ))
+
+    assert r.verdict == FAIL
+    assert "arc stage" in r.detail and "string" in r.detail
+
+
 # --- cell vocabulary -------------------------------------------------------
 
 

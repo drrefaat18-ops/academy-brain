@@ -86,11 +86,15 @@ def pedagogy_coverage(text: str) -> GateResult:
     problems: list[str] = []
 
     # Every arc stage declares cells, and every declared stage is in the arc.
-    for stage in arc:
+    bad_arc_stages = [stage for stage in arc if not isinstance(stage, str) or not stage.strip()]
+    for stage in bad_arc_stages:
+        problems.append(f"arc stage {stage!r} must be a non-empty string")
+    valid_arc = [stage for stage in arc if isinstance(stage, str) and stage.strip()]
+    for stage in valid_arc:
         if not arc_bloom.get(stage):
             problems.append(f"arc stage {stage!r} declares no Bloom's cells")
     for stage in arc_bloom:
-        if stage not in arc:
+        if stage not in valid_arc:
             problems.append(f"arc_bloom names {stage!r}, which is not in the declared arc")
 
     # Coverage is measured over SESSIONS only. `arc_bloom` is what the course
@@ -102,13 +106,17 @@ def pedagogy_coverage(text: str) -> GateResult:
 
     for group, entries in (("arc_bloom", arc_bloom), ("sessions", sessions)):
         for key, value in entries.items():
-            cells = value if group == "arc_bloom" else (value or {}).get("reaches")
             if group == "sessions" and not isinstance(value, dict):
                 problems.append(f"session {key!r} is not a mapping")
                 continue
+            cells = value if group == "arc_bloom" else value.get("reaches")
             if not cells:
                 if group == "sessions":
                     problems.append(f"session {key!r} declares no `reaches` cells")
+                continue
+            if not isinstance(cells, list):
+                field = "Bloom's cells" if group == "arc_bloom" else "`reaches`"
+                problems.append(f"{group}.{key} {field} must be a list")
                 continue
             reached: set[str] = set()
             for cell in cells:
