@@ -136,6 +136,38 @@ def test_a_waiver_file_is_not_itself_evidence(vault):
     assert ok and "waived" in detail  # satisfied as a waiver, not counted as an artifact
 
 
+# --- doctrine does not run backwards ---------------------------------------
+
+
+def _golden(vault, sid, name="deck-a.LOCKED-GOLDEN.pdf", sub=None):
+    d = vault / "80-generation" / sid / (sub or "")
+    d.mkdir(parents=True, exist_ok=True)
+    (d / name).write_bytes(b"%PDF-1.4 locked")
+
+
+def test_a_locked_session_is_not_re_judged(vault):
+    """A shipped session predates this gate; failing it now improves nothing."""
+    _golden(vault, "L1-s1")
+    results = stage_gate.check(vault, "L1-s1", "bundle", TODAY)
+    assert all(r["verdict"] == stage_gate.PASS for r in results)
+    assert "not re-judged" in results[0]["detail"]
+
+
+def test_a_rejected_golden_is_not_a_lock(vault):
+    """_rejected/ holds incident evidence, including goldens locked in error."""
+    _golden(vault, "L2-s1", name="deck-a-LOCKED-GOLDEN-IN-ERROR.pdf", sub="_rejected")
+    results = stage_gate.check(vault, "L2-s1", "bundle", TODAY)
+    assert any(r["verdict"] == stage_gate.FAIL for r in results)
+
+
+def test_an_unlocked_session_is_still_gated(vault):
+    """The grandfather clause covers shipped work only, never everything."""
+    _golden(vault, "L1-s1")  # a DIFFERENT session is locked
+    assert not stage_gate.is_locked(vault, "L2-s8")
+    results = stage_gate.check(vault, "L2-s8", "bundle", TODAY)
+    assert all(r["verdict"] == stage_gate.FAIL for r in results)
+
+
 # --- guards ----------------------------------------------------------------
 
 

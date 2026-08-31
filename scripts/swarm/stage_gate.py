@@ -85,6 +85,23 @@ def _level_of(sid: str) -> str:
     return sid.split("-", 1)[0].lstrip("L")
 
 
+def is_locked(vault: Path, sid: str) -> bool:
+    """Has this session already shipped a locked golden artifact?
+
+    A lock is a byte-identical `.LOCKED-GOLDEN.pdf` (pipeline-lessons.md §7).
+    Anything under `_rejected/` is explicitly NOT a lock — that directory holds
+    incident evidence, including goldens locked in error and then withdrawn, and
+    counting one would let a rejected artifact grant a permanent exemption.
+    """
+    root = vault / "80-generation" / sid
+    if not root.is_dir():
+        return False
+    return any(
+        "_rejected" not in p.parts and p.is_file()
+        for p in root.rglob("*.LOCKED-GOLDEN.pdf")
+    )
+
+
 def waiver_path(vault: Path, stage: Stage, sid: str) -> Path:
     return vault / stage.directory / f"{sid}.waiver.yaml"
 
@@ -155,6 +172,22 @@ def check(vault: Path, sid: str, entering: str, today: _dt.date | None = None) -
     vault = Path(vault)  # callers hand this in from argv and from other vaults
     today = today or _dt.date.today()
     index = [s.name for s in STAGE_CHAIN].index(entering)
+
+    # Doctrine does not run backwards (pipeline-lessons.md §8.4). A session that
+    # already shipped a locked golden passed the rules that existed when it
+    # shipped, and this gate did not. Failing it now would not improve it — it
+    # would only make a finished artifact look broken and invite a regeneration
+    # that nobody wants. New work is gated; history is read, not re-judged.
+    if is_locked(vault, sid):
+        return [
+            {
+                "stage": stage.name,
+                "verdict": PASS,
+                "detail": f"{sid} locked under doctrine < {DOCTRINE_VERSION}; not re-judged",
+            }
+            for stage in STAGE_CHAIN[:index]
+        ]
+
     results = []
     for stage in STAGE_CHAIN[:index]:
         ok, detail = check_stage(vault, stage, sid, today)
