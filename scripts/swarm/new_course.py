@@ -43,6 +43,7 @@ SCAFFOLD_FILES = (
     "00-contracts/rubric.md",
     "00-contracts/pipeline-lessons.md",
     "00-contracts/pedagogy.md",
+    "00-contracts/track-pedagogy.md",
     "00-contracts/pdf-intake-sop.md",
     # The live memory below is instantiated under the path the specialist reads.
     # Copying this vault's operational history would be course-content leakage.
@@ -127,8 +128,13 @@ class Seed:
     asset_ref_pattern: str
     asset_source_files: tuple[str, ...]
     expect_references: bool
+    # Optional pedagogical category (00-contracts/track-pedagogy.md). "" means
+    # undeclared, unlike audience/subject which are required.
+    track: str = ""
 
     def validate(self) -> None:
+        if not isinstance(self.track, str) or "\n" in self.track or "\r" in self.track:
+            raise ScaffoldError(f"track {self.track!r} must be a single-line string")
         if not _SLUG.fullmatch(self.slug):
             raise ScaffoldError(
                 f"slug {self.slug!r} must be lowercase letters, digits and hyphens"
@@ -206,6 +212,7 @@ def manifest_text(seed: Seed) -> str:
     doc = {
         "name": seed.name,
         "audience": seed.audience,
+        **({"track": seed.track} if seed.track else {}),
         "levels": list(seed.levels),
         "sessions_per_level": seed.sessions_per_level,
         "providers": list(seed.providers),
@@ -461,6 +468,7 @@ def _seed_from_args(ns: argparse.Namespace) -> Seed:
         asset_ref_pattern=ns.asset_ref_pattern,
         asset_source_files=tuple(ns.asset_source_files),
         expect_references=not ns.no_expect_references,
+        track=ns.track,
     )
 
 
@@ -483,6 +491,13 @@ def main(argv: list[str]) -> int:
         default=None,
         help="the domain the specialist is authoritative over, e.g. 'LEGO MINDSTORMS "
         "EV3' (default: --name)",
+    )
+    ap.add_argument(
+        "--track",
+        default="",
+        help="optional pedagogical category — one of early-childhood-tech, "
+        "kids-hardware, kids-software, stem-engineering, professional-technology "
+        "(00-contracts/track-pedagogy.md). Omit if the course has not declared one",
     )
     ap.add_argument("--levels", type=int, nargs="+", default=[1, 2])
     ap.add_argument("--sessions-per-level", type=int, default=8)

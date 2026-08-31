@@ -95,6 +95,7 @@ def test_topology_uses_the_loaded_course_name():
     loaded = config.CourseConfig(
         name="Validated Course",
         audience="ages 9-12",
+        track="",
         levels=(1,),
         sessions_per_level=1,
         providers=frozenset({"claude"}),
@@ -156,8 +157,27 @@ def test_new_course_inherits_standing_pipeline_contracts(course):
         "00-contracts/pipeline-lessons.md",
         "00-contracts/pdf-intake-sop.md",
         "00-contracts/pedagogy.md",
+        "00-contracts/track-pedagogy.md",
     ):
         assert (target / rel).read_bytes() == (VAULT / rel).read_bytes()
+
+
+def test_track_is_optional_and_omitted_when_undeclared(course):
+    """EV3_SEED declares no track — the manifest must not invent one."""
+    target, cfg = course
+
+    assert cfg.track == ""
+    assert "track:" not in (target / "course.yaml").read_text(encoding="utf-8")
+
+
+def test_track_is_written_when_declared(tmp_path):
+    seed = dataclasses.replace(EV3_SEED, track="stem-engineering")
+    target = tmp_path / "tracked"
+
+    cfg = new_course.create(seed, target, VAULT)
+
+    assert cfg.track == "stem-engineering"
+    assert "track: stem-engineering" in (target / "course.yaml").read_text(encoding="utf-8")
 
 
 def test_new_course_inherits_a_specialist_template(course):
@@ -476,6 +496,8 @@ def test_cli_creates_a_course(tmp_path, capsys):
             "EV3",
             "--audience",
             "ages 9-12",
+            "--track",
+            "stem-engineering",
             "--levels",
             "1",
             "--sessions-per-level",
@@ -498,6 +520,7 @@ def test_cli_creates_a_course(tmp_path, capsys):
     assert "4 session(s), 3 producing artifacts" in out
     assert "No course content was copied" in out
     assert config.load_course(target).sessions_per_level == 4
+    assert config.load_course(target).track == "stem-engineering"
 
 
 def test_cli_reports_a_refusal_as_a_nonzero_exit(tmp_path, capsys):

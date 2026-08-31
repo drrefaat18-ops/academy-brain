@@ -1,5 +1,10 @@
 # Kids-Track Rules
 
+> Historical record for the micro:bit course (now at `D:\vault\microbit-academy`).
+> For any NEW course, `00-contracts/track-pedagogy.md` is the current authority:
+> most of what this file reversed against the old adult EthOS has since become
+> an academy-wide default, and the rest is superseded there.
+
 EthOS was adapted for an adult audience on the AI course. Techno Square's Micro:bit course is a kids STEM track, which reverses several of those decisions. Where this file and the adult EthOS disagree, this file wins.
 
 ## Reversals

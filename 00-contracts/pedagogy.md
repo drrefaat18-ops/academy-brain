@@ -153,6 +153,10 @@ A course MUST declare, and the academy must never inherit from another course:
   manifest and referenced everywhere else. Never restated inline. The first
   course's research carried three different age bands across its own files
   precisely because each mention was written independently.
+- **Track** (optional). The pedagogical category the course belongs to.
+  Distinct from audience — see `00-contracts/track-pedagogy.md` for the
+  boundary and for which format decisions are actually track-conditional
+  versus already academy-wide.
 - **The delivery arc.** Its stage names and their declared Bloom's cells.
 - **The platform and its vocabulary.**
 - **The approved source ceiling.** Pedagogy research may not expand the

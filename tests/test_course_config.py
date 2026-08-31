@@ -79,6 +79,28 @@ def test_blank_audience_is_refused(tmp_path):
         load_course(tmp_path)
 
 
+def test_track_defaults_to_empty_when_undeclared(tmp_path):
+    write_config(tmp_path)
+
+    assert load_course(tmp_path).track == ""
+
+
+def test_track_is_read_when_declared(tmp_path):
+    write_config(tmp_path, VALID_CONFIG.replace("audience: ages 9-12\n", "audience: ages 9-12\ntrack: stem-engineering\n"))
+
+    assert load_course(tmp_path).track == "stem-engineering"
+
+
+def test_track_rejects_multiline(tmp_path):
+    write_config(
+        tmp_path,
+        VALID_CONFIG.replace("audience: ages 9-12\n", 'audience: ages 9-12\ntrack: "line1\\nline2"\n'),
+    )
+
+    with pytest.raises(CourseConfigError, match="track must be single-line"):
+        load_course(tmp_path)
+
+
 def test_load_course_missing_file_is_actionable(tmp_path):
     with pytest.raises(CourseConfigError, match=r"course\.yaml.*does not exist"):
         load_course(tmp_path)

@@ -48,6 +48,11 @@ class CourseConfig:
     # frontmatter to decide whether a file is learner- or trainer-facing. That
     # is a different question about a different file.
     audience: str
+    # The pedagogical category this course belongs to (e.g. "kids-hardware",
+    # "professional-technology") — see 00-contracts/track-pedagogy.md. Distinct
+    # from audience, which records the learners' age/experience. Optional and
+    # unenforced today; "" means the course has not declared one.
+    track: str
     levels: tuple[int, ...]
     sessions_per_level: int
     providers: frozenset[str]
@@ -72,6 +77,7 @@ _TOP_LEVEL_FIELDS = frozenset(
     {
         "name",
         "audience",
+        "track",
         "levels",
         "sessions_per_level",
         "providers",
@@ -80,6 +86,9 @@ _TOP_LEVEL_FIELDS = frozenset(
         "asset_discovery",
     }
 )
+# track is the one optional top-level field: a course that has not declared
+# one omits the key entirely rather than writing an empty string.
+_OPTIONAL_TOP_LEVEL_FIELDS = frozenset({"track"})
 _STAGE_FIELDS = frozenset({"digest", "digest_assets", "provenance", "receipts"})
 _DISCOVERY_FIELDS = frozenset(
     {"asset_ref_pattern", "asset_source_files", "expect_references"}
@@ -201,7 +210,7 @@ def load_course(root: Path) -> CourseConfig:
     unknown = set(data) - _TOP_LEVEL_FIELDS
     if unknown:
         raise CourseConfigError(f"{source}: unknown field(s): {', '.join(sorted(unknown))}")
-    missing = _TOP_LEVEL_FIELDS - set(data)
+    missing = (_TOP_LEVEL_FIELDS - _OPTIONAL_TOP_LEVEL_FIELDS) - set(data)
     if missing:
         raise CourseConfigError(f"{source}: missing field(s): {', '.join(sorted(missing))}")
 
@@ -226,6 +235,15 @@ def load_course(root: Path) -> CourseConfig:
         )
     if "\n" in audience_raw or "\r" in audience_raw:
         raise CourseConfigError(f"{source}: audience must be single-line")
+
+    # Optional. "" means undeclared — not every course needs a track, and
+    # inventing one to satisfy a required field is worse than admitting it has
+    # none (see track-pedagogy.md).
+    track_raw = data.get("track", "")
+    if not isinstance(track_raw, str):
+        raise CourseConfigError(f"{source}: track must be a string")
+    if "\n" in track_raw or "\r" in track_raw:
+        raise CourseConfigError(f"{source}: track must be single-line")
 
     levels_raw = data["levels"]
     if (
@@ -279,6 +297,7 @@ def load_course(root: Path) -> CourseConfig:
     return CourseConfig(
         name=name_raw.strip(),
         audience=audience_raw.strip(),
+        track=track_raw.strip(),
         levels=tuple(levels_raw),
         sessions_per_level=sessions,
         providers=frozenset(providers_raw),
