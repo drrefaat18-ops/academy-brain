@@ -131,8 +131,22 @@ def test_stage_tree_exists_and_is_empty(course):
         elif rel == "knowledge":  # carries the schema, which is not content
             assert [p.name for p in d.iterdir()] == ["_schema"]
             assert {p.name for p in (d / "_schema").iterdir()} == {"intake-schema.yaml"}
+        elif rel == "80-generation":  # carries the deck-prompt template, not content
+            assert {p.name for p in d.iterdir()} == {"nblm-student-deck-prompts.md"}
         else:
             assert list(d.iterdir()) == [], f"{rel} must start empty"
+
+
+def test_scaffolded_deck_prompt_file_satisfies_the_runtime_parser():
+    from swarm.generate_session import parse_prompts
+
+    prompt_file = VAULT / "80-generation/nblm-student-deck-prompts.md"
+    prompts = parse_prompts(prompt_file.read_text(encoding="utf-8"))
+
+    assert set(prompts) == {"deck-a", "deck-b", "summary"}
+    assert prompts["deck-a"].startswith("Generate a student slide deck")
+    assert prompts["deck-b"].startswith("Continue the SAME student deck")
+    assert prompts["summary"].startswith("Generate the student summary deck")
 
 
 def test_new_course_inherits_standing_pipeline_contracts(course):
@@ -208,6 +222,69 @@ def test_subject_text_is_not_treated_as_a_template_placeholder(tmp_path):
     seed = dataclasses.replace(EV3_SEED, subject="SUBJECT and COURSE design")
 
     rel = new_course._instantiate_specialist(seed, root)
+
+    text = (root / rel).read_text(encoding="utf-8")
+    assert "SUBJECT and COURSE design" in text
+
+
+def test_the_specialist_skill_is_instantiated_not_merely_copied(course):
+    target, _ = course
+    skill = target / ".claude/skills/kids-ev3-course-specialist/SKILL.md"
+    assert skill.is_file(), "new course has no instantiated specialist skill"
+    text = skill.read_text(encoding="utf-8")
+
+    assert "name: kids-ev3-course-specialist" in text
+    assert "knowledge/kids-ev3/source-catalog.yaml" in text
+    assert "LEGO MINDSTORMS EV3" in text
+    assert "TODO(kids-ev3):" in text
+
+
+def test_specialist_skill_instantiation_refuses_a_drifted_template(tmp_path):
+    root = tmp_path / "course"
+    template = root / new_course.SPECIALIST_SKILL_TEMPLATE
+    template.parent.mkdir(parents=True)
+    template.write_text(
+        (VAULT / new_course.SPECIALIST_SKILL_TEMPLATE)
+        .read_text(encoding="utf-8")
+        .replace("Copied into every new course", "Used by every new course"),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(new_course.ScaffoldError, match="template header"):
+        new_course._instantiate_specialist_skill(EV3_SEED, root)
+
+    assert not (
+        root / ".claude/skills/kids-ev3-course-specialist/SKILL.md"
+    ).exists()
+
+
+def test_specialist_skill_instantiation_refuses_missing_fill_markers(tmp_path):
+    root = tmp_path / "course"
+    template = root / new_course.SPECIALIST_SKILL_TEMPLATE
+    template.parent.mkdir(parents=True)
+    template.write_text(
+        (VAULT / new_course.SPECIALIST_SKILL_TEMPLATE)
+        .read_text(encoding="utf-8")
+        .replace("<!-- COURSE:", "<!-- FILL:"),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(new_course.ScaffoldError, match="no COURSE fill-in markers"):
+        new_course._instantiate_specialist_skill(EV3_SEED, root)
+
+    assert not (
+        root / ".claude/skills/kids-ev3-course-specialist/SKILL.md"
+    ).exists()
+
+
+def test_specialist_skill_preserves_template_tokens_inside_subject(tmp_path):
+    root = tmp_path / "course"
+    template = root / new_course.SPECIALIST_SKILL_TEMPLATE
+    template.parent.mkdir(parents=True)
+    template.write_bytes((VAULT / new_course.SPECIALIST_SKILL_TEMPLATE).read_bytes())
+    seed = dataclasses.replace(EV3_SEED, subject="SUBJECT and COURSE design")
+
+    rel = new_course._instantiate_specialist_skill(seed, root)
 
     text = (root / rel).read_text(encoding="utf-8")
     assert "SUBJECT and COURSE design" in text
