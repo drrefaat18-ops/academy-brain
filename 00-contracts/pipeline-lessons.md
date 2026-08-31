@@ -178,3 +178,66 @@ Keep these states distinct and never let one stand in for another:
 receipt-schema `BLOCKED`, learner readiness, owner permission to spend
 quota, generation, visual approval, lock state, and an independent
 level-wide Trainer Guide track.
+
+## 8. Stage prerequisites — starting a course, starting a level
+
+This section exists because a rule of this kind already failed once. A course
+contract required each session to "either produce the required research
+artifact or explicitly record why the stage is not applicable"; neither was
+ever done, and fifteen sessions shipped through a pipeline whose research,
+critique, patch and refutation stages were empty. Nothing objected, because
+nothing was checking. Prose asking for a justification is not a gate.
+
+### 8.1 The chain
+
+The ordered stages are: `90-receipts` → `30-research` → `10-digest` →
+`20-provenance` → `40-critique` → `50-patch` → `55-refuted` → `60-approved` →
+`70-localized` → `75-bundle` → `80-generation`. A session may not enter a
+stage until every earlier stage is satisfied. `scripts/swarm/stage_gate.py`
+is the executable statement of this list; `generate_session.py` calls it
+before any other gate, so a skipped stage hard-stops before quota is spent.
+
+Research is the one stage scoped to the LEVEL, not the session — one research
+set serves every session in its level. Every other stage is per-session.
+
+### 8.2 Satisfying a stage
+
+A stage is satisfied by evidence or by a waiver. Nothing else — not a
+directory that exists, not an empty file, not a note in a commit message.
+
+A waiver is `<stage-dir>/<session>.waiver.yaml` and must carry `reason`,
+`authority`, `scope`, and `granted`. `reason` is one of exactly three values:
+
+- `not-applicable` — the stage cannot apply to this session, ever.
+- `blocked` — the stage is owed and not yet done. **Requires `expires`.**
+- `superseded` — another artifact covers this session. Requires `covered_by`.
+
+The vocabulary is the point. Free text collapses "we will do this next week"
+and "this will never apply" into one indistinguishable sentence, and the
+first silently becomes the second. A `blocked` waiver without an expiry date
+is a permanent exemption wearing a temporary label, and is refused. An
+expired waiver is refused. A malformed waiver is refused, never ignored.
+
+### 8.3 Starting a new LEVEL of an existing course
+
+A new level is not a new course and not a continuation. It inherits, and it
+must not inherit, along a fixed line:
+
+- **Inherited:** contracts, brand and output rules, schemas, gates, the
+  course manifest, and the course's specialist agent framework.
+- **NOT inherited — must be produced fresh:** the level's own research set,
+  its source catalog and the approved-source ceiling, its learning
+  progression, and its audience assumptions.
+
+Reusing the previous level's research to satisfy a new level is the specific
+failure this rule prevents: an L1 research file has never seen L3's material
+and cannot have judged it.
+
+### 8.4 Doctrine versioning
+
+`stage_gate.DOCTRINE_VERSION` is stamped into every prerequisite receipt. A
+later doctrine change does not retroactively invalidate a locked session:
+artifacts are read under the doctrine version they passed under. Never
+regenerate, rewrite, or re-judge a locked session to make it retrospectively
+compliant with a rule written after it shipped. Backfill new doctrine into a
+course's forthcoming levels, never into its shipped ones.

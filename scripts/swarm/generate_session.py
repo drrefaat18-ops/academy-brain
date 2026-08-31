@@ -38,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from swarm import overlay as _overlay  # noqa: E402
 from swarm import paths  # noqa: E402
+from swarm import stage_gate  # noqa: E402
 
 VAULT = paths.VAULT_ROOT
 COURSE = paths.COURSE
@@ -195,6 +196,24 @@ def _front_matter(path: Path, text: str) -> dict:
     if not isinstance(data, dict):
         raise HardStop(f"{path} front matter is not a mapping")
     return data
+
+
+def enforce_stage_chain(sid: str) -> None:
+    """Refuse to generate a session that skipped a pipeline stage.
+
+    Every other gate here asks whether this session's artifacts are GOOD. None
+    asked whether the stages that produce them ever ran — which is how a whole
+    course reached generation having never opened research or critique.
+    """
+    results = stage_gate.check(VAULT, sid, "generation")
+    missing = [r for r in results if r["verdict"] == stage_gate.FAIL]
+    if missing:
+        raise HardStop(
+            f"{sid} has not completed every prerequisite stage — "
+            + "; ".join(f"{r['stage']}: {r['detail']}" for r in missing)
+            + f". Complete the stage, or record a waiver (see 00-contracts/"
+            f"pipeline-lessons.md §8). Doctrine version {stage_gate.DOCTRINE_VERSION}."
+        )
 
 
 def enforce_blueprint_gate(path: Path) -> None:
@@ -1324,6 +1343,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     try:
+        enforce_stage_chain(sid)
         assets = parse_asset_mapping(mapping.read_text(encoding="utf-8"))
         enforce_blueprint_gate(bundle / "blueprint.md")
         enforce_asset_gate(assets)
