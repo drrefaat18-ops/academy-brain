@@ -137,8 +137,59 @@ def test_new_course_inherits_standing_pipeline_contracts(course):
     for rel in (
         "00-contracts/pipeline-lessons.md",
         "00-contracts/pdf-intake-sop.md",
+        "00-contracts/pedagogy.md",
     ):
         assert (target / rel).read_bytes() == (VAULT / rel).read_bytes()
+
+
+def test_new_course_inherits_a_specialist_template(course):
+    """The portability hole: contracts addressed an agent the new vault lacked.
+
+    Every course needs its own domain specialist, and pedagogy.md assigns the
+    pedagogy record to that agent. A scaffolder that copies the rules but not
+    the role produces a course whose doctrine addresses nobody.
+    """
+    target, _ = course
+    rel = ".claude/agents/_TEMPLATE-course-specialist.md"
+    assert (target / rel).is_file(), "new course has no specialist template"
+    assert (target / rel).read_bytes() == (VAULT / rel).read_bytes()
+
+
+def test_the_pedagogy_gate_runs_in_the_new_course(course):
+    """Doctrine that ports without its gate is prose again."""
+    target, _ = course
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from swarm import gates; assert 'pedagogy-coverage' in gates.REGISTRY",
+        ],
+        cwd=target,
+        env={"PYTHONPATH": str(target / "scripts"), "PATH": ""},
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+
+
+def test_the_stage_gate_runs_in_the_new_course(course):
+    """A new course must refuse a skipped stage on day one, not once someone wires it."""
+    target, _ = course
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; from swarm import stage_gate; "
+            "r = stage_gate.check(sys.argv[1], 'L1-s1', 'bundle'); "
+            "assert all(x['verdict'] == 'FAIL' for x in r), r",
+            str(target),
+        ],
+        cwd=target,
+        env={"PYTHONPATH": str(target / "scripts"), "PATH": ""},
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
 
 
 def test_no_course_content_is_copied(course):

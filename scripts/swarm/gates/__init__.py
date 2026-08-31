@@ -43,4 +43,10 @@ def register(name: str):
     return wrap
 
 
-from swarm.gates import arabic_ratio, boundary_check, brand_palette, cite_filter  # noqa: E402,F401
+from swarm.gates import (  # noqa: E402,F401
+    arabic_ratio,
+    boundary_check,
+    brand_palette,
+    cite_filter,
+    pedagogy_coverage,
+)

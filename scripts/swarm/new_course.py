@@ -42,10 +42,15 @@ SCAFFOLD_FILES = (
     "00-contracts/brand-and-output.md",
     "00-contracts/rubric.md",
     "00-contracts/pipeline-lessons.md",
+    "00-contracts/pedagogy.md",
     "00-contracts/pdf-intake-sop.md",
     "knowledge/_schema/intake-schema.yaml",
     "75-bundle/_TEMPLATE-blueprint.md",
     "75-bundle/_TEMPLATE-debugging-lab.md",
+    # The specialist template. Without this a new course inherits the pipeline
+    # and the contracts but no domain authority to run them, and every rule in
+    # pedagogy.md addresses an agent that does not exist in the new vault.
+    ".claude/agents/_TEMPLATE-course-specialist.md",
 )
 SCAFFOLD_DIRS = (
     "scripts",

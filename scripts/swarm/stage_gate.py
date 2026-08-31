@@ -152,6 +152,7 @@ def check(vault: Path, sid: str, entering: str, today: _dt.date | None = None) -
             f"unknown stage {entering!r} — expected one of "
             f"{', '.join(s.name for s in STAGE_CHAIN)}"
         )
+    vault = Path(vault)  # callers hand this in from argv and from other vaults
     today = today or _dt.date.today()
     index = [s.name for s in STAGE_CHAIN].index(entering)
     results = []
