@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "compare": "tsx src/compare.ts",
-    "demo:receipt": "tsx src/receipt.demo.ts"
+    "demo:receipt": "tsx src/receipt.demo.ts",
+    "demo:institution": "tsx src/institution.demo.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.0",
