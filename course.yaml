@@ -1,4 +1,18 @@
-name: TechnoSquare micro:bit
+# academy-brain — TEMPLATE MANIFEST, NOT A COURSE
+#
+# This vault is the war room: it holds the rules, gates, contracts and
+# scaffolding that every real course inherits. It is not itself a course, and
+# nothing should be authored into its stage folders.
+#
+# This file exists only because `scripts/swarm/paths.py` loads a manifest at
+# import time, so the toolchain cannot run without one. The values below are
+# deliberately generic placeholders. A real course gets its own vault via
+#   python -m swarm.new_course <slug> <target-dir> ...
+# which writes a real manifest there.
+#
+# If you find yourself editing this file to describe actual course material,
+# stop: you are working in the wrong vault.
+name: Academy Template
 levels: [1, 2]
 sessions_per_level: 8
 providers: [claude, codex, opencode, hermes]
@@ -16,18 +30,8 @@ stages:
   digest_assets: _assets
   provenance: 20-provenance
   receipts: 90-receipts
-
-# Asset discovery — how this course names assets and where they are referenced.
-# Explicit rather than defaulted: a gate that falls back to another course's
-# naming finds nothing and reports PASS on a course with every asset missing.
 asset_discovery:
-  # single-quoted: YAML double quotes would eat the regex backslashes
-  asset_ref_pattern: '`((?:img|tata|technosquare)[A-Za-z0-9_.\-]*\.(?:png|gif|jpg|jpeg))`'
+  asset_ref_pattern: (asset-[A-Za-z0-9_-]+\.(?:png|jpg|jpeg|gif))
   asset_source_files:
     - slides-source.md
-    - home-summary.md
-  # Every session deck in this course cites assets, so a bundle that references
-  # none has a broken pattern or the wrong source files. Stated rather than
-  # inferred: assets/ legitimately also holds helper scripts and intermediate
-  # frames, so "assets exist" proves nothing on its own.
   expect_references: true
