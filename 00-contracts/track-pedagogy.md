@@ -86,23 +86,39 @@ track-conditional format rule, add it here with the same evidence discipline
 as everything else in `00-contracts/` — a stated rationale, not an inherited
 assumption from one course's decisions.
 
-## 4. Open conflict — Trainer Guide cadence (unresolved, do not silently pick a side)
+## 4. Trainer Guide cadence — settled
 
-The contracts leave the relationship between Trainer Guide drafts and the
-final guide unresolved:
+**Owner ruling: `brand-and-output.md`'s definition governs.** Three contracts
+describe the Trainer Guide at different altitudes, which read as a conflict.
+They are not in conflict; they describe different objects.
 
-- `topology.md` (generated per-course by `new_course.py` from the stage
-  shape) describes `75-bundle` as **per-session**: one
-  `trainer-guide.md` per session folder.
-- `brand-and-output.md` §1 requires that per-session draft in each student
-  deck's source bundle, while §1b also requires **one level-wide final PDF**
-  that must not be split per session.
-- `pipeline-lessons.md` §7 names "an independent **level-wide** Trainer Guide
-  track" as a distinct thing from per-session lock state.
+| Object | Cadence | Where |
+|---|---|---|
+| `trainer-guide.md` **draft** | one per session | `75-bundle/<session>/` |
+| Trainer Guide **final PDF** | one per level, never split | owner-run, Antigravity |
+| Trainer Guide **track state** | level-wide, independent | not per-session lock |
 
-The contracts do not say whether or how the per-session drafts aggregate into
-the level-wide final PDF, or which stage owns that final artifact. A course
-specialist or producer that hits this should record the ambiguity in its
-receipt's `holes` list (per the specialist's own stop-condition discipline)
-rather than resolve it by assumption. This is an owner decision, not a
-specialist judgment call.
+Read each contract against that table and the disagreement disappears:
+
+- `topology.md` (generated per-course by `new_course.py`) lists
+  `trainer-guide.md` among `75-bundle`'s per-session folder contents. That is
+  the **draft**, and it is also NBLM source #2 for the student deck
+  (`brand-and-output.md` §1). It is not the deliverable.
+- `brand-and-output.md` §1b defines the deliverable: **one single PDF, Techno
+  Square themed, covering the level.** Do not split it per session, and do not
+  spend NBLM quota on it — it renders through Antigravity, manually,
+  owner-run.
+- `pipeline-lessons.md` §7 is not describing a third artifact. It is a
+  state-hygiene rule: the level-wide Trainer Guide track is its own state axis
+  and must never be conflated with a session's lock state. A locked session
+  says nothing about whether the level's guide exists.
+
+**How drafts reach the final PDF.** They are its source material, not its
+sections — the owner composes the level guide from the per-session drafts.
+No stage aggregates them mechanically, and none should: §1b assigns the
+final artifact to a manual, owner-run Antigravity pass.
+
+Two consequences the pipeline must respect. A session locks without its
+Trainer Guide contribution being final — that is not a hole and must not be
+recorded as one. And the absence of a level-wide PDF while sessions are still
+in flight is expected state, not a missing artifact.
