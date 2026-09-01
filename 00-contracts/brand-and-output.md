@@ -229,13 +229,65 @@ Arabic must be simple, short, age-appropriate, beginner-friendly, RTL-correct.
 No heavy academic Arabic, no long paragraphs, no adult-level explanation on a
 kids track.
 
+### 5a. Sentence shape — the blend, not the mirror
+
+The ratio alone does not describe correct output. The source doctrine
+(`Abdeen_Moon_OS_Docs/Academy_Brain_OS/Academy_Language_and_Output_Rules.md`,
+"Example Language Style") shows the intended shape as a **short bilingual
+sentence**: an Arabic sentence carrying the meaning, with the English technical
+term embedded in it.
+
+```
+Push يعني أزق الحاجة بعيد.
+Icon Block بيقول للـ Robot يعمل إيه.
+Movement Block بيحرك الـ Robot كله.
+```
+
+Two constraints follow, and both are binding:
+
+- **No long English technical definition or explanatory/procedural paragraph.**
+  The source's "Example Language Style" states: *do not write long technical
+  definitions unless the course age requires it.* Separately, its Language Rule
+  assigns English to titles and technical terms while assigning explanations
+  and student instructions to Arabic. Together those rules support the general
+  boundary; they do not make every procedure a "definition." English on a
+  student slide carries **terms**, not the explanatory prose.
+- **No mirrored translation blocks.** A full English paragraph followed by a
+  full Arabic paragraph restating the same content is a **defect**, even when
+  the Arabic half is simple and the term vocabulary is correct. It doubles the
+  slide's text and breaks *not text-heavy* and *one idea per slide*. It also
+  makes the 30/70 balance harder to satisfy; the actual ratio is measured, not
+  assumed from the presence of two blocks.
+
+Procedural detail that students genuinely need and that cannot compress into
+short bilingual sentences (a full reset/scan sequence, an ordered parameter
+list) is split across slides one beat at a time or carried visually. Detail
+that is actually trainer scripting, timing, assessment, classroom management,
+private methodology, or long pedagogical explanation belongs in the Trainer
+Guide under §6. Neither case is licence to print the paragraph on a student
+slide and translate it underneath.
+
+The 30/70 ratio is measured over the slide's rendered text as a whole. A
+glossary, New Words, or Key Concepts entry is a named shape exception: an
+English term paired with one short Arabic gloss, inline (`English — عربي`) or
+as aligned term/gloss list items, is not a mirrored block. The exception ends
+at the gloss: it does not permit paired explanatory sentences, clauses, or
+paragraphs.
+
+This rule applies when student-slide sources or decks are newly generated or
+regenerated. It does not by itself revoke the locked/golden status of an
+artifact accepted under earlier doctrine; reopening such an artifact makes the
+current contract applicable.
+
 ## 6. Student-facing / trainer-facing separation
 
 Student slides MUST NOT contain: trainer scripts, trainer timing, internal notes,
 assessment checklists, classroom management notes, private methodology, long
 pedagogical explanations. Trainer Guide is **internal use only**.
 
-This is a hard boundary — the existing `trainer_boundary` gate enforces it.
+This is a hard boundary. The existing `trainer-boundary` gate checks named leak
+markers; agent/human review remains responsible for boundary violations the
+marker list cannot recognize.
 
 ## 7. Interaction law (EthOS v2 addition)
 
@@ -253,11 +305,17 @@ teaching job to YouTube.
 
 ## 8. QA checklist — Student Slides (binding gate criteria)
 
+Every item is a binding review criterion, but not every item has a deterministic
+code gate. The existing `arabic-ratio` gate approximates the ratio from Arabic
+and Latin letters in learner-facing source text; sentence shape and mirrored
+blocks require agent/human review of the source and rendered deck.
+
 - visual
 - age-appropriate
 - not text-heavy
 - one idea per slide
 - English terms + Arabic explanation
+- short bilingual sentences, not mirrored English/Arabic paragraph pairs (§5a)
 - no trainer-only content
 - Tata used intentionally
 - branding consistent
@@ -265,6 +323,7 @@ teaching job to YouTube.
 ## 9. What EthOS v2 changes vs moonOS
 
 Kept: every rule above. Changed: the manual custom-GPT operator loop becomes a
-multi-provider agentic swarm with deterministic gates and provenance receipts.
-The doctrine is identical; the enforcement is now mechanical instead of relying
-on one person remembering it. That person left.
+multi-provider agentic swarm with deterministic gates where implemented,
+explicit review criteria for the remaining doctrine, and provenance receipts.
+Enforcement is partly mechanical and partly recorded agent/human review rather
+than relying on one person remembering it. That person left.
