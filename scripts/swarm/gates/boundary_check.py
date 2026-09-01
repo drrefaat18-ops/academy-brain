@@ -1,11 +1,19 @@
 """Detect trainer-only content leaking into student-facing output.
 
-Brain OS, Academy_Language_and_Output_Rules.md: student-facing outputs must
-NOT include trainer scripts, trainer timing, internal notes, assessment
-checklists, or classroom management notes.
+Brain OS, Academy_Language_and_Output_Rules.md, Student-Facing Content Rule:
+student-facing outputs must NOT include trainer scripts, trainer timing,
+internal trainer notes, assessment checklists, classroom management notes,
+private methodology, or long pedagogical explanations.
+
+The marker list below covers the leaks that name themselves. Two items of that
+rule have no reliable surface form and are NOT checked here — private
+methodology and long pedagogical explanation are judged by agent/human review
+per `00-contracts/brand-and-output.md` §6.
 """
 
 from __future__ import annotations
+
+import re
 
 from swarm.gates import FAIL, PASS, UNVERIFIED, GateResult, register
 
@@ -18,9 +26,33 @@ TRAINER_MARKERS: tuple[str, ...] = (
     "classroom management",
     "assessment checklist",
     "minutes for this",
+    "trainer timing",
+    "session flow",
+    "trainer flow",
+    "debugging note",
+    "reflection question",
+    "exit ticket",
     "ملاحظة للمدرب",
     "إجابة متوقعة",
     "دليل المدرب",
+)
+
+# Trainer-guide session flow is stated as a clock-time timeline (`00:00-00:10`)
+# per brand-and-output.md §1d. That format is trainer-only by function, and no
+# plain-word marker catches it.
+#
+# The obvious learner-side false positive — a video timestamp range — is not one:
+# the academy teaches no video clips, and §7 already makes a video-only student
+# slide a defect, confining video URLs to the Trainer Guide. Do not widen or
+# weaken this pattern to admit them.
+TRAINER_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "clock-time timeline",
+        re.compile(
+            r"\b(?:[01]?\d|2[0-3]):[0-5]\d\s*[-–—]\s*"
+            r"(?:[01]?\d|2[0-3]):[0-5]\d\b"
+        ),
+    ),
 )
 
 
@@ -32,6 +64,7 @@ def check(text: str) -> GateResult:
 
     lowered = text.lower()
     matches = [m for m in TRAINER_MARKERS if m.lower() in lowered]
+    matches += [name for name, pattern in TRAINER_PATTERNS if pattern.search(text)]
 
     if matches:
         return GateResult(

@@ -25,10 +25,14 @@ _DIRECTIVE = re.compile(
 )
 # Bracketed editorial markers, e.g. [REPLACES video slide], [FIXED — patch ...].
 _MARKER = re.compile(r"\[(?:REPLACES|FIXED|NEW|Verified)[^\]]*\]", re.IGNORECASE)
+# A Trainer Guide's own internal-use declaration (brand-and-output.md §2). The
+# only body-level audience signal trusted here: it is a positive self-statement,
+# not a negated one, and appears in no student artifact.
+_INTERNAL_ONLY = re.compile(r"\binternal use only\b", re.IGNORECASE)
 # Trailing provenance sections that document the work rather than teach.
 _TAIL = re.compile(
     r"^##+\s+(Interaction-law changelog|QA notes|Asset provenance|"
-    r"Rendering rules|Hard exclusions).*$",
+    r"Rendering rules|Hard exclusions|Slide budget note).*$",
     re.IGNORECASE,
 )
 
@@ -51,8 +55,17 @@ def split_frontmatter(raw: str) -> tuple[dict, str]:
     return meta, parts[2]
 
 
-def audience_of(meta: dict) -> str:
-    """Classify the artifact from its frontmatter. Defaults to student (stricter)."""
+def audience_of(meta: dict, body: str = "") -> str:
+    """Classify the artifact. Frontmatter first, then the body's own declaration.
+
+    Defaults to student (stricter). A shipped Trainer Guide can carry only lock
+    metadata in its frontmatter — no audience/type/role — which read as student
+    and put the trainer gates on a trainer artifact. Such a guide declares
+    itself in the body instead, with the phrase brand-and-output.md §2 requires.
+    """
+    if _INTERNAL_ONLY.search(body):
+        return TRAINER
+
     blob = " ".join(
         str(meta.get(k, "")) for k in ("audience", "type", "role")
     ).lower()
@@ -78,7 +91,7 @@ def audience_of(meta: dict) -> str:
 def learner_text(raw: str) -> tuple[str, str]:
     """Strip everything a learner never reads. Returns (text, audience)."""
     meta, body = split_frontmatter(raw)
-    audience = audience_of(meta)
+    audience = audience_of(meta, body)
 
     kept: list[str] = []
     in_tail = False
